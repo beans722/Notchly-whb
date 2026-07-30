@@ -10,11 +10,19 @@ import AppKit
 @MainActor
 final class LockScreenStateController {
     private let model: LockScreenOverlayModel
+    private let onLocked: () -> Void
+    private let onUnlocked: () -> Void
     private var observers: [Any] = []
     private var pollingTask: Task<Void, Never>?
 
-    init(model: LockScreenOverlayModel) {
+    init(
+        model: LockScreenOverlayModel,
+        onLocked: @escaping () -> Void = {},
+        onUnlocked: @escaping () -> Void = {}
+    ) {
         self.model = model
+        self.onLocked = onLocked
+        self.onUnlocked = onUnlocked
     }
 
     func start() {
@@ -68,6 +76,12 @@ final class LockScreenStateController {
         pollingTask?.cancel()
         pollingTask = nil
 
+        if state == .locked {
+            onLocked()
+        } else {
+            onUnlocked()
+        }
+
         guard model.state != state else { return }
         model.state = state
     }
@@ -87,6 +101,12 @@ final class LockScreenStateController {
                 let currentState = readCurrentState()
 
                 if model.state != currentState {
+                    if currentState == .locked {
+                        onLocked()
+                    } else {
+                        onUnlocked()
+                    }
+
                     model.state = currentState
                 }
 
