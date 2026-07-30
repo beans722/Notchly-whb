@@ -5,6 +5,7 @@
 //  Created by n0xbyte on 03.05.2026.
 //
 
+import AppKit
 import Foundation
 import Combine
 import CoreGraphics
@@ -62,6 +63,23 @@ final class AppEnvironment {
 private final class SparkleUserDriverDelegate: NSObject, SPUStandardUserDriverDelegate {
     var supportsGentleScheduledUpdateReminders: Bool {
         true
+    }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem,
+        andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        true
+    }
+
+    func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool,
+        forUpdate update: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        guard handleShowingUpdate, !state.userInitiated else { return }
+
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 

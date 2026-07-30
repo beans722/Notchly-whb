@@ -178,7 +178,9 @@ final class MusicManager: ObservableObject {
 
     private func fetchTrackInfoOnce() async -> Bool {
         await withCheckedContinuation { continuation in
+            let callbackGate = OneShotCallbackGate()
             mediaController.getTrackInfo { [weak self] trackInfo in
+                guard callbackGate.claim() else { return }
                 guard let self else {
                     continuation.resume(returning: false)
                     return
@@ -1106,8 +1108,10 @@ final class MusicManager: ObservableObject {
 
     private func fetchTrackInfo(for bundleIdentifier: String) async -> TrackInfo? {
         await withCheckedContinuation { continuation in
+            let callbackGate = OneShotCallbackGate()
             let controller = MediaController(bundleIdentifier: bundleIdentifier)
             controller.getTrackInfo { trackInfo in
+                guard callbackGate.claim() else { return }
                 continuation.resume(returning: trackInfo)
             }
         }
@@ -1115,8 +1119,10 @@ final class MusicManager: ObservableObject {
 
     private func fetchCurrentTrackInfo() async -> TrackInfo? {
         await withCheckedContinuation { continuation in
+            let callbackGate = OneShotCallbackGate()
             let controller = MediaController()
             controller.getTrackInfo { trackInfo in
+                guard callbackGate.claim() else { return }
                 continuation.resume(returning: trackInfo)
             }
         }
@@ -1329,6 +1335,20 @@ private final class ArtworkProcessingState: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return currentRequestID == requestID
+    }
+}
+
+private final class OneShotCallbackGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isClaimed = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard !isClaimed else { return false }
+        isClaimed = true
+        return true
     }
 }
 

@@ -77,7 +77,7 @@ final class LockScreenWallpaperManager {
     private var cachedWallpaperStoreIndex: Data?
     private var activeArtworkURLs: Set<URL> = []
     private var wallpaperReloadTransitionControllers: [NSWindowController] = []
-    private var wallpaperReloadTransitionCleanupTask: DispatchWorkItem?
+    private var wallpaperReloadTransitionCleanupTask: Task<Void, Never>?
     private var pendingDynamicWallpaperStoreIndex: Data?
     private var pendingDynamicWallpaperRestoreTask: DispatchWorkItem?
     private var isDynamicWallpaperRestoreInProgress = false
@@ -965,8 +965,11 @@ final class LockScreenWallpaperManager {
             deadline: .now() + .milliseconds(60)
         ) { [weak self] in
             guard let self else { return }
+            let previousWallpaperAgentPID = self.currentWallpaperAgentPID()
             self.reloadWallpaperAgent()
-            self.scheduleWallpaperReloadTransitionCleanup()
+            self.scheduleWallpaperReloadTransitionCleanup(
+                previousWallpaperAgentPID: previousWallpaperAgentPID
+            )
         }
     }
 
@@ -1027,6 +1030,8 @@ final class LockScreenWallpaperManager {
             window.hidesOnDeactivate = false
             window.isMovable = false
             window.ignoresMouseEvents = true
+            window.animationBehavior = .none
+            window.alphaValue = 1
             window.level = NSWindow.Level(
                 rawValue: Int(CGWindowLevelForKey(.desktopWindow)) + 1
             )
@@ -1049,16 +1054,128 @@ final class LockScreenWallpaperManager {
         wallpaperReloadTransitionControllers = controllers
     }
 
-    private func scheduleWallpaperReloadTransitionCleanup() {
+    private func scheduleWallpaperReloadTransitionCleanup(
+        previousWallpaperAgentPID: pid_t?
+    ) {
         wallpaperReloadTransitionCleanupTask?.cancel()
-        let task = DispatchWorkItem { [weak self] in
-            self?.closeWallpaperReloadTransition()
+        wallpaperReloadTransitionCleanupTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            var didRelaunchWallpaperAgent = false
+            for _ in 0..<40 {
+                do {
+                    try await Task.sleep(for: .milliseconds(50))
+                } catch {
+                    return
+                }
+
+                guard !Task.isCancelled else { return }
+                guard let currentPID = self.currentWallpaperAgentPID(),
+                      currentPID != previousWallpaperAgentPID else {
+                    continue
+                }
+
+                didRelaunchWallpaperAgent = true
+                break
+            }
+
+            if didRelaunchWallpaperAgent {
+                do {
+                    try await Task.sleep(for: .milliseconds(180))
+                } catch {
+                    return
+                }
+
+                for _ in 0..<20 {
+                    guard !Task.isCancelled else { return }
+                    if self.wallpaperWindowsHaveVisibleContent() {
+                        self.fadeOutWallpaperReloadTransition()
+                        return
+                    }
+
+                    do {
+                        try await Task.sleep(for: .milliseconds(60))
+                    } catch {
+                        return
+                    }
+                }
+            }
+
+            self.fadeOutWallpaperReloadTransition()
         }
-        wallpaperReloadTransitionCleanupTask = task
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + .seconds(2),
-            execute: task
+    }
+
+    private func currentWallpaperAgentPID() -> pid_t? {
+        NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.apple.wallpaper.agent"
+        ).first?.processIdentifier
+    }
+
+    private func wallpaperWindowsHaveVisibleContent() -> Bool {
+        NSScreen.screens.allSatisfy { screen in
+            guard let image = wallpaperWindowImage(
+                for: displayID(for: screen)
+            ) else {
+                return false
+            }
+            return imageHasVisibleContent(image)
+        }
+    }
+
+    private func imageHasVisibleContent(_ image: CGImage) -> Bool {
+        let width = 8
+        let height = 8
+        var pixels = [UInt8](
+            repeating: 0,
+            count: width * height * 4
         )
+        let didDraw = pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else {
+                return false
+            }
+
+            context.interpolationQuality = .low
+            context.draw(
+                image,
+                in: CGRect(x: 0, y: 0, width: width, height: height)
+            )
+            return true
+        }
+        guard didDraw else { return false }
+
+        return stride(from: 0, to: pixels.count, by: 4).contains { index in
+            pixels[index] > 4
+                || pixels[index + 1] > 4
+                || pixels[index + 2] > 4
+        }
+    }
+
+    private func fadeOutWallpaperReloadTransition() {
+        wallpaperReloadTransitionCleanupTask = nil
+        let controllers = wallpaperReloadTransitionControllers
+        guard !controllers.isEmpty else { return }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.32
+            context.timingFunction = CAMediaTimingFunction(
+                name: .easeInEaseOut
+            )
+            controllers.forEach {
+                $0.window?.animator().alphaValue = 0
+            }
+        } completionHandler: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.closeWallpaperReloadTransition()
+            }
+        }
     }
 
     private func closeWallpaperReloadTransition() {
