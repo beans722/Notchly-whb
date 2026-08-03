@@ -21,7 +21,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private lazy var lockScreenController = LockScreenStateController(
-        model: environment.lockScreenOverlayModel
+        model: environment.lockScreenOverlayModel,
+        onLocked: { [environment] in
+            environment.lockScreenWallpaperManager.screenDidLock()
+        },
+        onUnlocked: { [environment] in
+            environment.lockScreenWallpaperManager.screenDidUnlock()
+            environment.lockScreenWallpaperManager.refreshCachedDesktopWallpapers()
+        }
     )
 
     private lazy var overlayController = SkyLightOverlayController(
@@ -31,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         guard validateSingleRunningInstance() else { return }
         environment.lockScreenWallpaperManager.recoverSynchronously()
+        environment.lockScreenWallpaperManager.refreshCachedDesktopWallpapers()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -43,6 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.musicManager.start()
         environment.networkStatusManager.start()
         overlayController.show()
+        environment.lockScreenWallpaperManager.startDesktopWallpaperMonitoring()
+        environment.lockScreenIdentityManager.start(
+            observing: environment.lockScreenOverlayModel
+        )
 
         startupTask?.cancel()
         startupTask = Task { @MainActor [weak self] in
@@ -69,6 +81,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.focusManager.stop()
         environment.brightnessManager.stop()
         environment.networkStatusManager.stop()
+        environment.lockScreenWallpaperManager.stopDesktopWallpaperMonitoring()
+        environment.lockScreenIdentityManager.stop()
         lockScreenController.stop()
         overlayController.stop()
         environment.lockScreenWallpaperManager.restoreSynchronously()

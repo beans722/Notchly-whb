@@ -675,6 +675,7 @@ final class SkyLightOverlayController {
         let playerYPosition = lockScreenPlayerYPosition(for: screen)
         let artworkSize = lockScreenArtworkSize(for: screen)
         let expandedPlayerShift: CGFloat = 18
+        let expandedArtworkGrowth: CGFloat = 18
         let playerScale: CGFloat = 1.10
         let playerWidth: CGFloat = 339 * playerScale
         let playerHeight: CGFloat = 154 * playerScale
@@ -684,7 +685,7 @@ final class SkyLightOverlayController {
         )
         let lockedIslandWidth = configuredIslandWidth * 1.10 + 16
         let lowerPlayerOffset = playerHeight * 0.10
-        let displayedArtworkSize = (artworkSize + expandedPlayerShift) * 1.05
+        let displayedArtworkSize = (artworkSize + expandedArtworkGrowth) * 1.05
         let expandedCompositionOffset = displayedArtworkSize * 0.10
         let maximumPlayerYPosition = playerYPosition + lowerPlayerOffset +
             expandedCompositionOffset + expandedPlayerShift

@@ -54,7 +54,9 @@ struct LockScreenOverlayRootView: View {
     }
 
     private let playerHideAnimationDuration: TimeInterval = 0.14
+    private let artworkCollapseAnimationDuration: TimeInterval = 0.30
     private let expandedPlayerShift: CGFloat = 18
+    private let expandedArtworkGrowth: CGFloat = 18
     private let playerScale: CGFloat = 1.10
     private let playerBaseHeight: CGFloat = 154
 
@@ -73,7 +75,7 @@ struct LockScreenOverlayRootView: View {
 
     private var displayedArtworkSize: CGFloat {
         guard model.isArtworkExpanded else { return expandedArtworkSize }
-        return (expandedArtworkSize + expandedPlayerShift) * 1.05
+        return (expandedArtworkSize + expandedArtworkGrowth) * 1.05
     }
 
     var body: some View {
@@ -244,7 +246,7 @@ struct LockScreenOverlayRootView: View {
 
     private func applyArtworkWallpaper(
         artwork: NSImage,
-        onReadyToApply: @escaping @MainActor () -> Void = {}
+        onReadyToApply: @escaping @MainActor (NSImage?) -> Void = { _ in }
     ) {
         wallpaperManager.apply(
             artwork: artwork,
@@ -265,13 +267,23 @@ struct LockScreenOverlayRootView: View {
     private func collapseArtwork() {
         guard model.isArtworkExpanded || model.prefersExpandedArtwork else { return }
 
-        artworkTransitionID = UUID()
+        let transitionID = UUID()
+        artworkTransitionID = transitionID
         model.prefersExpandedArtwork = false
-        withAnimation(.smooth(duration: 0.30, extraBounce: 0)) {
+        withAnimation(.smooth(
+            duration: artworkCollapseAnimationDuration,
+            extraBounce: 0
+        )) {
             model.isArtworkExpanded = false
         }
 
-        wallpaperManager.restoreAnimated()
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + artworkCollapseAnimationDuration
+        ) {
+            guard artworkTransitionID == transitionID,
+                  !model.prefersExpandedArtwork else { return }
+            wallpaperManager.restoreAnimated()
+        }
     }
 
     @MainActor
@@ -310,7 +322,7 @@ struct LockScreenOverlayRootView: View {
         let transitionID = UUID()
         artworkTransitionID = transitionID
 
-        applyArtworkWallpaper(artwork: artwork) {
+        applyArtworkWallpaper(artwork: artwork) { _ in
             guard artworkTransitionID == transitionID,
                   model.prefersExpandedArtwork,
                   model.state == .locked,

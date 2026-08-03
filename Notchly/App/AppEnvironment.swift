@@ -36,6 +36,7 @@ final class AppEnvironment {
     let cursorHookIntegrationManager = CursorHookIntegrationManager()
     let lockScreenOverlayModel = LockScreenOverlayModel()
     let lockScreenWallpaperManager = LockScreenWallpaperManager()
+    let lockScreenIdentityManager = LockScreenIdentityManager()
     let whatsNewWindow = WhatsNewWindow()
 
     lazy var updaterController = SPUStandardUpdaterController(
