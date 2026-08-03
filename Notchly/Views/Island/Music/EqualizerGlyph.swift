@@ -236,6 +236,11 @@ final class EqualizerGlyphNSView: NSView {
             animation.autoreverses = true
             animation.repeatCount = .infinity
             animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animation.preferredFrameRateRange = CAFrameRateRange(
+                minimum: 12,
+                maximum: 30,
+                preferred: 24
+            )
             animation.beginTime = CACurrentMediaTime() + phaseDelay(at: index)
             animation.isRemovedOnCompletion = false
 

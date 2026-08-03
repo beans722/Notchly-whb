@@ -23,7 +23,7 @@ struct BrightnessSettingsView: View {
                 VStack(spacing: 0) {
                     SettingsToggleRow(
                         title: "Brightness",
-                        subtitle: "Show a small island status when display brightness changes.",
+                        subtitle: "Show a small island status when you change display brightness manually.",
                         isOn: $settingsManager.showBrightnessStatus
                     )
 

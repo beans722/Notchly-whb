@@ -57,7 +57,9 @@ final class MusicManager: ObservableObject {
     private var pausedPlaybackValidationTask: Task<Void, Never>?
     private var artworkClearTask: Task<Void, Never>?
     private var startupTask: Task<Void, Never>?
+    private var manualVolumeRefreshTask: Task<Void, Never>?
     private var volumePollTimer: Timer?
+    private var manualVolumeInputObserver: NSObjectProtocol?
     private var appTerminationObserver: NSObjectProtocol?
     private var isStarted = false
     private let artworkProcessingQueue = DispatchQueue(
@@ -81,13 +83,14 @@ final class MusicManager: ObservableObject {
     private var activeSourceRefreshShouldClearIfEmpty = false
     private var cachedOutputMuted: Bool = false
     private var lastOutputMutePollTime: TimeInterval = 0
+    private var handledVolumeInputGeneration = 0
 
     private let progressTickInterval: TimeInterval = 1.0
-    private let volumePollInterval: TimeInterval = 0.22
+    private let volumePollInterval: TimeInterval = 3.0
     private let outputMutePollInterval: TimeInterval = 1.0
     private let outputVolumeEventThreshold = 0.045
     private let activeSourceScanThrottle: TimeInterval = 1.2
-    private let pausedSourceScanInterval = Duration.milliseconds(1_200)
+    private let pausedSourceScanInterval = Duration.seconds(4)
 
     init() {
         bindMediaController()
@@ -99,6 +102,8 @@ final class MusicManager: ObservableObject {
         guard !isStarted else { return }
         isStarted = true
         isResolvingNowPlaying = true
+        ManualSystemControlMonitor.shared.start()
+        installManualVolumeObserver()
 
         let mediaController = mediaController
         Task.detached(priority: .utility) {
@@ -152,6 +157,9 @@ final class MusicManager: ObservableObject {
         pausedPlaybackValidationTask = nil
         artworkClearTask?.cancel()
         artworkClearTask = nil
+        manualVolumeRefreshTask?.cancel()
+        manualVolumeRefreshTask = nil
+        uninstallManualVolumeObserver()
         artworkProcessingState.invalidate()
         pendingArtworkIdentity = ""
         volumePollTimer?.invalidate()
@@ -168,8 +176,12 @@ final class MusicManager: ObservableObject {
         nowPlayingTransitionRecoveryTask?.cancel()
         pausedPlaybackValidationTask?.cancel()
         artworkClearTask?.cancel()
+        manualVolumeRefreshTask?.cancel()
         artworkProcessingState.invalidate()
         volumePollTimer?.invalidate()
+        if let manualVolumeInputObserver {
+            NotificationCenter.default.removeObserver(manualVolumeInputObserver)
+        }
         if let appTerminationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(appTerminationObserver)
         }
@@ -786,12 +798,13 @@ final class MusicManager: ObservableObject {
             }
         }
 
+        timer.tolerance = 0.75
         volumePollTimer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
 
     @MainActor
-    private func refreshOutputVolume(emitsEvent: Bool) {
+    private func refreshOutputVolume(emitsEvent: Bool, forceMuteRefresh: Bool = false) {
         let previousDisplayVolume = isOutputMuted ? 0 : outputVolume
         let previousMuted = isOutputMuted
         var nextVolume = outputVolume
@@ -805,7 +818,7 @@ final class MusicManager: ObservableObject {
         }
 
         let now = Date.timeIntervalSinceReferenceDate
-        if now - lastOutputMutePollTime >= outputMutePollInterval {
+        if forceMuteRefresh || now - lastOutputMutePollTime >= outputMutePollInterval {
             cachedOutputMuted = SystemOutputVolume.isMuted() ?? false
             lastOutputMutePollTime = now
         }
@@ -825,8 +838,51 @@ final class MusicManager: ObservableObject {
             isOutputMuted = nextMuted
         }
 
-        if emitsEvent && (volumeChanged || muteChanged) {
-            outputVolumeEventID += 1
+        guard emitsEvent,
+              volumeChanged || muteChanged,
+              let inputGeneration = ManualSystemControlMonitor.shared.recentVolumeInput(
+                after: handledVolumeInputGeneration
+              ) else { return }
+
+        handledVolumeInputGeneration = inputGeneration
+        outputVolumeEventID += 1
+    }
+
+    @MainActor
+    private func installManualVolumeObserver() {
+        guard manualVolumeInputObserver == nil else { return }
+
+        manualVolumeInputObserver = NotificationCenter.default.addObserver(
+            forName: .notchlyManualVolumeInput,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.scheduleManualVolumeRefresh()
+            }
+        }
+    }
+
+    @MainActor
+    private func uninstallManualVolumeObserver() {
+        guard let manualVolumeInputObserver else { return }
+        NotificationCenter.default.removeObserver(manualVolumeInputObserver)
+        self.manualVolumeInputObserver = nil
+    }
+
+    @MainActor
+    private func scheduleManualVolumeRefresh() {
+        guard manualVolumeRefreshTask == nil else { return }
+
+        manualVolumeRefreshTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(35))
+            guard !Task.isCancelled, let self else { return }
+            self.refreshOutputVolume(emitsEvent: true, forceMuteRefresh: true)
+
+            try? await Task.sleep(for: .milliseconds(110))
+            guard !Task.isCancelled else { return }
+            self.refreshOutputVolume(emitsEvent: true, forceMuteRefresh: true)
+            self.manualVolumeRefreshTask = nil
         }
     }
 

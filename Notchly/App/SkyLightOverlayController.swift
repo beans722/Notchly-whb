@@ -491,7 +491,7 @@ final class SkyLightOverlayController {
         // A low-frequency fallback is the only permission-free way to catch it.
         fullscreenPollingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(500))
+                try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
                 self?.evaluateFullscreenVisibility()
             }

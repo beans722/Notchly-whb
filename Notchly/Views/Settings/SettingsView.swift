@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
+    @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
     @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
     @State private var selectedSection: SettingsSection = .about
     @State private var searchText = ""
@@ -246,6 +247,7 @@ struct SettingsView: View {
             CodexSettingsView(
                 settingsManager: settingsManager,
                 codexHookIntegrationManager: codexHookIntegrationManager,
+                claudeHookIntegrationManager: claudeHookIntegrationManager,
                 cursorHookIntegrationManager: cursorHookIntegrationManager
             )
             

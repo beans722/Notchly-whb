@@ -130,6 +130,7 @@ private struct UnlockSoundSettingsRow: View {
 struct CodexSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
+    @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
     @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
 
     var body: some View {
@@ -145,6 +146,14 @@ struct CodexSettingsView: View {
                     SettingsDivider()
 
                     AgentHookIntegrationRow(
+                        title: "Claude Code Alerts",
+                        manager: claudeHookIntegrationManager,
+                        description: "Shows approval, waiting, completion, and failure alerts from Claude Code terminal sessions."
+                    )
+
+                    SettingsDivider()
+
+                    AgentHookIntegrationRow(
                         title: "Cursor Alerts",
                         manager: cursorHookIntegrationManager,
                         description: "Shows Cursor shell approval and completion alerts using local Cursor hooks."
@@ -154,7 +163,7 @@ struct CodexSettingsView: View {
 
                     CodexAlertSoundSettingsRow(
                         title: "Need Approval Sound",
-                        subtitle: "Play a subtle sound when Codex is waiting for approval.",
+                        subtitle: "Play a subtle sound when an AI agent is waiting for approval.",
                         kind: .accessRequest,
                         isEnabled: $settingsManager.enableCodexApprovalAlertSound
                     )
@@ -163,7 +172,7 @@ struct CodexSettingsView: View {
 
                     CodexAlertSoundSettingsRow(
                         title: "Task Completed Sound",
-                        subtitle: "Play a subtle sound when Codex finishes a task.",
+                        subtitle: "Play a subtle sound when an AI agent finishes a task.",
                         kind: .completed,
                         isEnabled: $settingsManager.enableCodexCompletedAlertSound
                     )
@@ -176,7 +185,7 @@ struct CodexSettingsView: View {
                                 Text("Job Done Duration")
                                     .font(.system(size: 13, weight: .medium))
 
-                                Text("How long Codex completion alerts stay visible before returning to music.")
+                                Text("How long AI agent completion alerts stay visible before returning to music.")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                             }
@@ -202,10 +211,12 @@ struct CodexSettingsView: View {
         }
         .onAppear {
             codexHookIntegrationManager.refreshStatus()
+            claudeHookIntegrationManager.refreshStatus()
             cursorHookIntegrationManager.refreshStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             codexHookIntegrationManager.refreshStatus()
+            claudeHookIntegrationManager.refreshStatus()
             cursorHookIntegrationManager.refreshStatus()
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -277,6 +288,7 @@ private protocol AgentHookIntegrationManaging: ObservableObject {
 }
 
 extension CodexHookIntegrationManager: AgentHookIntegrationManaging {}
+extension ClaudeHookIntegrationManager: AgentHookIntegrationManaging {}
 extension CursorHookIntegrationManager: AgentHookIntegrationManaging {}
 
 private struct AgentHookIntegrationRow<Manager: AgentHookIntegrationManaging>: View {

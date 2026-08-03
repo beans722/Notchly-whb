@@ -33,7 +33,7 @@ final class BatteryManager: ObservableObject {
     func startMonitoring() {
         timer?.invalidate()
 
-        let timer = Timer(timeInterval: 5.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 15.0, repeats: true) { [weak self] _ in
             guard let self else { return }
 
             guard !self.shouldPauseBatteryUpdates else {
@@ -43,6 +43,7 @@ final class BatteryManager: ObservableObject {
             self.updateBatteryInfo()
         }
 
+        timer.tolerance = 3.0
         self.timer = timer
         RunLoop.main.add(timer, forMode: .common)
     }
