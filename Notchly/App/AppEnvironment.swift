@@ -58,7 +58,8 @@ final class AppEnvironment {
         settingsManager: settingsManager,
         codexHookIntegrationManager: codexHookIntegrationManager,
         claudeHookIntegrationManager: claudeHookIntegrationManager,
-        cursorHookIntegrationManager: cursorHookIntegrationManager
+        cursorHookIntegrationManager: cursorHookIntegrationManager,
+        lockScreenIdentityManager: lockScreenIdentityManager
     )
 }
 

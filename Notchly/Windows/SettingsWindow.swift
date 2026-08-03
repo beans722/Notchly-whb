@@ -14,17 +14,20 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let codexHookIntegrationManager: CodexHookIntegrationManager
     private let claudeHookIntegrationManager: ClaudeHookIntegrationManager
     private let cursorHookIntegrationManager: CursorHookIntegrationManager
+    private let lockScreenIdentityManager: LockScreenIdentityManager
 
     init(
         settingsManager: SettingsManager,
         codexHookIntegrationManager: CodexHookIntegrationManager,
         claudeHookIntegrationManager: ClaudeHookIntegrationManager,
-        cursorHookIntegrationManager: CursorHookIntegrationManager
+        cursorHookIntegrationManager: CursorHookIntegrationManager,
+        lockScreenIdentityManager: LockScreenIdentityManager
     ) {
         self.settingsManager = settingsManager
         self.codexHookIntegrationManager = codexHookIntegrationManager
         self.claudeHookIntegrationManager = claudeHookIntegrationManager
         self.cursorHookIntegrationManager = cursorHookIntegrationManager
+        self.lockScreenIdentityManager = lockScreenIdentityManager
         super.init()
     }
 
@@ -43,7 +46,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             settingsManager: settingsManager,
             codexHookIntegrationManager: codexHookIntegrationManager,
             claudeHookIntegrationManager: claudeHookIntegrationManager,
-            cursorHookIntegrationManager: cursorHookIntegrationManager
+            cursorHookIntegrationManager: cursorHookIntegrationManager,
+            lockScreenIdentityManager: lockScreenIdentityManager
         )
             .ignoresSafeArea(.container, edges: .top)
 

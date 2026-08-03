@@ -20,8 +20,15 @@ public protocol LockScreenIdentityHelperProtocol: NSObjectProtocol {
     )
 }
 
+enum LockScreenIdentityAuthorizationState: Equatable {
+    case enabled
+    case needsApproval
+    case disabled
+    case unavailable
+}
+
 @MainActor
-final class LockScreenIdentityManager {
+final class LockScreenIdentityManager: ObservableObject {
     private enum Constants {
         static let helperIdentifier = "xyz.notchly.Notchly.IdentityHelper"
         static let daemonPlistName = "xyz.notchly.Notchly.IdentityHelper.plist"
@@ -29,6 +36,7 @@ final class LockScreenIdentityManager {
     }
 
     private let daemonService = SMAppService.daemon(plistName: Constants.daemonPlistName)
+    @Published private(set) var authorizationState: LockScreenIdentityAuthorizationState = .disabled
     private var connection: NSXPCConnection?
     private var cancellables = Set<AnyCancellable>()
     private var applicationActiveObserver: NSObjectProtocol?
@@ -67,6 +75,56 @@ final class LockScreenIdentityManager {
         }
 
         prepareService()
+    }
+
+    func refreshAuthorizationState() {
+        updateAuthorizationState()
+    }
+
+    func requestAuthorizationFromSettings() {
+        guard isInstalledApplication else {
+            authorizationState = .unavailable
+            return
+        }
+
+        hasPresentedApprovalPrompt = true
+
+        switch daemonService.status {
+        case .enabled:
+            updateAuthorizationState()
+
+        case .requiresApproval:
+            SMAppService.openSystemSettingsLoginItems()
+            pollForApproval()
+
+        case .notRegistered, .notFound:
+            do {
+                try daemonService.register()
+                updateAuthorizationState()
+
+                if daemonService.status == .requiresApproval {
+                    SMAppService.openSystemSettingsLoginItems()
+                    pollForApproval()
+                } else if daemonService.status == .enabled, desiredHidden {
+                    connectIfNeeded()
+                }
+            } catch {
+                let registrationError = error as NSError
+                updateAuthorizationState()
+
+                if daemonService.status == .requiresApproval
+                    || isApprovalRequired(registrationError) {
+                    authorizationState = .needsApproval
+                    SMAppService.openSystemSettingsLoginItems()
+                    pollForApproval()
+                } else {
+                    presentRegistrationError(registrationError)
+                }
+            }
+
+        @unknown default:
+            authorizationState = .disabled
+        }
     }
 
     func stop() {
@@ -186,9 +244,12 @@ final class LockScreenIdentityManager {
 
     private func prepareService() {
         guard isInstalledApplication else {
+            authorizationState = .unavailable
             print("[LockScreenIdentity] Helper registration is available from /Applications.")
             return
         }
+
+        updateAuthorizationState()
 
         switch daemonService.status {
         case .enabled:
@@ -247,6 +308,7 @@ final class LockScreenIdentityManager {
     }
 
     private func refreshServiceState() {
+        updateAuthorizationState()
         guard hasStarted else { return }
 
         if daemonService.status == .enabled {
@@ -287,6 +349,7 @@ final class LockScreenIdentityManager {
         approvalPollingTask = Task { @MainActor [weak self] in
             for _ in 0..<120 {
                 guard !Task.isCancelled, let self, self.hasStarted else { return }
+                self.updateAuthorizationState()
                 if self.daemonService.status == .enabled {
                     self.approvalPollingTask = nil
                     if self.desiredHidden {
@@ -296,7 +359,26 @@ final class LockScreenIdentityManager {
                 }
                 try? await Task.sleep(for: .milliseconds(500))
             }
+            self?.updateAuthorizationState()
             self?.approvalPollingTask = nil
+        }
+    }
+
+    private func updateAuthorizationState() {
+        guard isInstalledApplication else {
+            authorizationState = .unavailable
+            return
+        }
+
+        switch daemonService.status {
+        case .enabled:
+            authorizationState = .enabled
+        case .requiresApproval:
+            authorizationState = .needsApproval
+        case .notRegistered, .notFound:
+            authorizationState = .disabled
+        @unknown default:
+            authorizationState = .disabled
         }
     }
 

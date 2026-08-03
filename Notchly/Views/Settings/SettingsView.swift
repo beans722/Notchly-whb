@@ -12,6 +12,7 @@ struct SettingsView: View {
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
     @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
     @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
+    @ObservedObject var lockScreenIdentityManager: LockScreenIdentityManager
     @State private var selectedSection: SettingsSection = .about
     @State private var searchText = ""
 
@@ -226,7 +227,10 @@ struct SettingsView: View {
     private var selectedContent: some View {
         switch selectedSection {
         case .general:
-            GeneralSettingsView(settingsManager: settingsManager)
+            GeneralSettingsView(
+                settingsManager: settingsManager,
+                lockScreenIdentityManager: lockScreenIdentityManager
+            )
 
         case .focus:
             FocusSettingsView(settingsManager: settingsManager)
