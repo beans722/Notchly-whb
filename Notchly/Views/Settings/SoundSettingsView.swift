@@ -23,7 +23,7 @@ struct SoundSettingsView: View {
                 VStack(spacing: 0) {
                     SettingsToggleRow(
                         title: "Sound",
-                        subtitle: "Show a small island status when output volume changes.",
+                        subtitle: "Show a small island status when you change output volume manually.",
                         isOn: $settingsManager.showSoundStatus
                     )
 

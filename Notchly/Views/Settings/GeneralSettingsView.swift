@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GeneralSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
+    @ObservedObject var lockScreenIdentityManager: LockScreenIdentityManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -58,6 +59,12 @@ struct GeneralSettingsView: View {
 
                     SettingsDivider()
 
+                    LockScreenProfileSettingsRow(
+                        manager: lockScreenIdentityManager
+                    )
+
+                    SettingsDivider()
+
                     SettingsToggleRow(
                         title: "Hide in Fullscreen",
                         subtitle: "Hide the island while the active app is fullscreen.",
@@ -80,7 +87,71 @@ struct GeneralSettingsView: View {
                 }
             }
         }
+        .onAppear {
+            lockScreenIdentityManager.refreshAuthorizationState()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            lockScreenIdentityManager.refreshAuthorizationState()
+        }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct LockScreenProfileSettingsRow: View {
+    @ObservedObject var manager: LockScreenIdentityManager
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Hide Lock Screen Profile")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(description)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 16)
+
+            if manager.authorizationState == .enabled {
+                Label("Enabled", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.green)
+            } else {
+                Button(actionTitle) {
+                    manager.requestAuthorizationFromSettings()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(manager.authorizationState == .unavailable)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var description: String {
+        switch manager.authorizationState {
+        case .enabled:
+            return "Your photo and name are hidden while expanded artwork is visible."
+        case .needsApproval:
+            return "Allow Notchly in Login Items to hide your profile during expanded artwork."
+        case .disabled:
+            return "Enable the background helper used only while expanded artwork is visible."
+        case .unavailable:
+            return "Move Notchly to Applications before enabling the Lock Screen helper."
+        }
+    }
+
+    private var actionTitle: String {
+        manager.authorizationState == .needsApproval
+            ? "Open Settings"
+            : "Enable"
     }
 }
 
@@ -130,6 +201,7 @@ private struct UnlockSoundSettingsRow: View {
 struct CodexSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
+    @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
     @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
 
     var body: some View {
@@ -145,6 +217,14 @@ struct CodexSettingsView: View {
                     SettingsDivider()
 
                     AgentHookIntegrationRow(
+                        title: "Claude Code Alerts",
+                        manager: claudeHookIntegrationManager,
+                        description: "Shows approval, waiting, completion, and failure alerts from Claude Code terminal sessions."
+                    )
+
+                    SettingsDivider()
+
+                    AgentHookIntegrationRow(
                         title: "Cursor Alerts",
                         manager: cursorHookIntegrationManager,
                         description: "Shows Cursor shell approval and completion alerts using local Cursor hooks."
@@ -154,7 +234,7 @@ struct CodexSettingsView: View {
 
                     CodexAlertSoundSettingsRow(
                         title: "Need Approval Sound",
-                        subtitle: "Play a subtle sound when Codex is waiting for approval.",
+                        subtitle: "Play a subtle sound when an AI agent is waiting for approval.",
                         kind: .accessRequest,
                         isEnabled: $settingsManager.enableCodexApprovalAlertSound
                     )
@@ -163,7 +243,7 @@ struct CodexSettingsView: View {
 
                     CodexAlertSoundSettingsRow(
                         title: "Task Completed Sound",
-                        subtitle: "Play a subtle sound when Codex finishes a task.",
+                        subtitle: "Play a subtle sound when an AI agent finishes a task.",
                         kind: .completed,
                         isEnabled: $settingsManager.enableCodexCompletedAlertSound
                     )
@@ -176,7 +256,7 @@ struct CodexSettingsView: View {
                                 Text("Job Done Duration")
                                     .font(.system(size: 13, weight: .medium))
 
-                                Text("How long Codex completion alerts stay visible before returning to music.")
+                                Text("How long AI agent completion alerts stay visible before returning to music.")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                             }
@@ -202,10 +282,12 @@ struct CodexSettingsView: View {
         }
         .onAppear {
             codexHookIntegrationManager.refreshStatus()
+            claudeHookIntegrationManager.refreshStatus()
             cursorHookIntegrationManager.refreshStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             codexHookIntegrationManager.refreshStatus()
+            claudeHookIntegrationManager.refreshStatus()
             cursorHookIntegrationManager.refreshStatus()
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -277,6 +359,7 @@ private protocol AgentHookIntegrationManaging: ObservableObject {
 }
 
 extension CodexHookIntegrationManager: AgentHookIntegrationManaging {}
+extension ClaudeHookIntegrationManager: AgentHookIntegrationManaging {}
 extension CursorHookIntegrationManager: AgentHookIntegrationManaging {}
 
 private struct AgentHookIntegrationRow<Manager: AgentHookIntegrationManaging>: View {

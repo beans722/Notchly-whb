@@ -954,7 +954,9 @@ extension ContentView {
         guard !isAgentAlertBlockingOtherEvents else { return }
 
         dismissNetworkStatusBeforeCompetingEvent()
-        let collapseDuration = 0.34
+        let collapseDuration = 0.28
+        let expandDuration = 0.44
+        let settleDuration = 0.1
 
         if status == .brightnessCollapse {
             return
@@ -963,7 +965,8 @@ extension ContentView {
         if status == .brightnessPreview {
             scheduleBrightnessReturn(
                 returnStatus: brightnessReturnStatus,
-                collapseDuration: collapseDuration
+                collapseDuration: collapseDuration,
+                expandDuration: expandDuration
             )
             return
         }
@@ -993,14 +996,10 @@ extension ContentView {
             brightnessReturnStatus = status
         }
 
-        let canCollapseFromMusic =
+        brightnessCollapseShowsMusic =
             dynamicManager.currentModule == .music &&
             settingsManager.showMusic &&
             musicManager.hasNowPlayingContent
-
-        brightnessCollapseShowsMusic =
-            canCollapseFromMusic &&
-            (status != .brightnessCollapse || brightnessCollapseShowsMusic)
 
         withAnimation(.smooth(duration: collapseDuration, extraBounce: 0)) {
             status = .brightnessCollapse
@@ -1016,18 +1015,27 @@ extension ContentView {
                 guard !isAgentAlertBlockingOtherEvents else { return }
                 guard status == .brightnessCollapse else { return }
 
-                brightnessCollapseShowsMusic = false
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    brightnessCollapseShowsMusic = false
+                }
 
-                withAnimation(.smooth(duration: 0.42, extraBounce: 0)) {
+                withAnimation(.smooth(duration: expandDuration, extraBounce: 0)) {
                     status = .brightnessPreview
                 }
             }
 
+            try? await Task.sleep(for: .seconds(expandDuration + settleDuration))
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
+                guard status == .brightnessPreview else { return }
                 brightnessStatusTask = nil
                 scheduleBrightnessReturn(
                     returnStatus: returnStatus,
-                    collapseDuration: collapseDuration
+                    collapseDuration: collapseDuration,
+                    expandDuration: expandDuration
                 )
             }
         }
@@ -1035,7 +1043,8 @@ extension ContentView {
 
     func scheduleBrightnessReturn(
         returnStatus: IslandStatus,
-        collapseDuration: Double
+        collapseDuration: Double,
+        expandDuration: Double
     ) {
         guard brightnessStatusTask == nil else { return }
 
@@ -1061,7 +1070,7 @@ extension ContentView {
                 guard status == .brightnessPreview else { return }
 
                 brightnessCollapseShowsMusic = false
-                hidesBrightnessStatusContentDuringReturn = true
+                hidesBrightnessStatusContentDuringReturn = false
 
                 withAnimation(.smooth(duration: collapseDuration, extraBounce: 0)) {
                     status = .brightnessCollapse
@@ -1075,13 +1084,23 @@ extension ContentView {
                 guard !isAgentAlertBlockingOtherEvents else { return }
                 guard status == .brightnessCollapse else { return }
 
-                brightnessCollapseShowsMusic = true
-                hidesBrightnessStatusContentDuringReturn = false
-                brightnessStatusTask = nil
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    brightnessCollapseShowsMusic = true
+                }
 
-                withAnimation(.smooth(duration: 0.64, extraBounce: 0)) {
+                withAnimation(.smooth(duration: expandDuration, extraBounce: 0)) {
                     status = returnStatus
                 }
+            }
+
+            try? await Task.sleep(for: .seconds(expandDuration + 0.1))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard status == returnStatus else { return }
+                brightnessStatusTask = nil
 
                 if (returnStatus == .opened || returnStatus == .musicPreview) && !isPointerInsideIsland {
                     scheduleAutoClose(after: 2.0)
@@ -1138,7 +1157,9 @@ extension ContentView {
         guard !isAgentAlertBlockingOtherEvents else { return }
 
         dismissNetworkStatusBeforeCompetingEvent()
-        let collapseDuration = 0.34
+        let collapseDuration = 0.28
+        let expandDuration = 0.44
+        let settleDuration = 0.1
 
         if status == .volumeCollapse {
             return
@@ -1147,7 +1168,8 @@ extension ContentView {
         if status == .volumePreview {
             scheduleVolumeReturn(
                 returnStatus: volumeReturnStatus,
-                collapseDuration: collapseDuration
+                collapseDuration: collapseDuration,
+                expandDuration: expandDuration
             )
             return
         }
@@ -1177,14 +1199,10 @@ extension ContentView {
             volumeReturnStatus = status
         }
 
-        let canCollapseFromMusic =
+        volumeCollapseShowsMusic =
             dynamicManager.currentModule == .music &&
             settingsManager.showMusic &&
             musicManager.hasNowPlayingContent
-
-        volumeCollapseShowsMusic =
-            canCollapseFromMusic &&
-            (status != .volumeCollapse || volumeCollapseShowsMusic)
 
         withAnimation(.smooth(duration: collapseDuration, extraBounce: 0)) {
             status = .volumeCollapse
@@ -1200,18 +1218,27 @@ extension ContentView {
                 guard !isAgentAlertBlockingOtherEvents else { return }
                 guard status == .volumeCollapse else { return }
 
-                volumeCollapseShowsMusic = false
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    volumeCollapseShowsMusic = false
+                }
 
-                withAnimation(.smooth(duration: 0.42, extraBounce: 0)) {
+                withAnimation(.smooth(duration: expandDuration, extraBounce: 0)) {
                     status = .volumePreview
                 }
             }
 
+            try? await Task.sleep(for: .seconds(expandDuration + settleDuration))
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
+                guard status == .volumePreview else { return }
                 volumeStatusTask = nil
                 scheduleVolumeReturn(
                     returnStatus: returnStatus,
-                    collapseDuration: collapseDuration
+                    collapseDuration: collapseDuration,
+                    expandDuration: expandDuration
                 )
             }
         }
@@ -1219,7 +1246,8 @@ extension ContentView {
 
     func scheduleVolumeReturn(
         returnStatus: IslandStatus,
-        collapseDuration: Double
+        collapseDuration: Double,
+        expandDuration: Double
     ) {
         guard volumeStatusTask == nil else { return }
 
@@ -1245,7 +1273,7 @@ extension ContentView {
                 guard status == .volumePreview else { return }
 
                 volumeCollapseShowsMusic = false
-                hidesVolumeStatusContentDuringReturn = true
+                hidesVolumeStatusContentDuringReturn = false
 
                 withAnimation(.smooth(duration: collapseDuration, extraBounce: 0)) {
                     status = .volumeCollapse
@@ -1259,13 +1287,23 @@ extension ContentView {
                 guard !isAgentAlertBlockingOtherEvents else { return }
                 guard status == .volumeCollapse else { return }
 
-                volumeCollapseShowsMusic = true
-                hidesVolumeStatusContentDuringReturn = false
-                volumeStatusTask = nil
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    volumeCollapseShowsMusic = true
+                }
 
-                withAnimation(.smooth(duration: 0.64, extraBounce: 0)) {
+                withAnimation(.smooth(duration: expandDuration, extraBounce: 0)) {
                     status = returnStatus
                 }
+            }
+
+            try? await Task.sleep(for: .seconds(expandDuration + 0.1))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard status == returnStatus else { return }
+                volumeStatusTask = nil
 
                 if (returnStatus == .opened || returnStatus == .musicPreview) && !isPointerInsideIsland {
                     scheduleAutoClose(after: 2.0)

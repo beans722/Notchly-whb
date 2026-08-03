@@ -491,7 +491,7 @@ final class SkyLightOverlayController {
         // A low-frequency fallback is the only permission-free way to catch it.
         fullscreenPollingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(500))
+                try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
                 self?.evaluateFullscreenVisibility()
             }
@@ -675,6 +675,7 @@ final class SkyLightOverlayController {
         let playerYPosition = lockScreenPlayerYPosition(for: screen)
         let artworkSize = lockScreenArtworkSize(for: screen)
         let expandedPlayerShift: CGFloat = 18
+        let expandedArtworkGrowth: CGFloat = 18
         let playerScale: CGFloat = 1.10
         let playerWidth: CGFloat = 339 * playerScale
         let playerHeight: CGFloat = 154 * playerScale
@@ -684,7 +685,7 @@ final class SkyLightOverlayController {
         )
         let lockedIslandWidth = configuredIslandWidth * 1.10 + 16
         let lowerPlayerOffset = playerHeight * 0.10
-        let displayedArtworkSize = (artworkSize + expandedPlayerShift) * 1.05
+        let displayedArtworkSize = (artworkSize + expandedArtworkGrowth) * 1.05
         let expandedCompositionOffset = displayedArtworkSize * 0.10
         let maximumPlayerYPosition = playerYPosition + lowerPlayerOffset +
             expandedCompositionOffset + expandedPlayerShift

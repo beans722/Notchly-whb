@@ -52,6 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.networkStatusManager.start()
         overlayController.show()
         environment.lockScreenWallpaperManager.startDesktopWallpaperMonitoring()
+        environment.lockScreenIdentityManager.start(
+            observing: environment.lockScreenOverlayModel
+        )
 
         startupTask?.cancel()
         startupTask = Task { @MainActor [weak self] in
@@ -79,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.brightnessManager.stop()
         environment.networkStatusManager.stop()
         environment.lockScreenWallpaperManager.stopDesktopWallpaperMonitoring()
+        environment.lockScreenIdentityManager.stop()
         lockScreenController.stop()
         overlayController.stop()
         environment.lockScreenWallpaperManager.restoreSynchronously()

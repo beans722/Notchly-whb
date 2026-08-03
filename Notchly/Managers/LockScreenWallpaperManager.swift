@@ -207,7 +207,7 @@ final class LockScreenWallpaperManager {
     func apply(
         artwork: NSImage,
         on screen: NSScreen,
-        onReadyToApply: @escaping @MainActor () -> Void = {}
+        onReadyToApply: @escaping @MainActor (NSImage?) -> Void = { _ in }
     ) {
         guard !isUnlockTransitionInProgress,
               isScreenLocked() else {
@@ -229,7 +229,7 @@ final class LockScreenWallpaperManager {
             context: nil,
             hints: nil
         ) else {
-            onReadyToApply()
+            onReadyToApply(nil)
             return
         }
 
@@ -255,7 +255,7 @@ final class LockScreenWallpaperManager {
                 if wallpaperStoreUsesStaticImage(originalWallpaperStoreIndex) {
                     guard let backedUpWallpapers = backedUpOriginalWallpapers(wallpapers) else {
                         originalWallpaperStoreIndex = nil
-                        onReadyToApply()
+                        onReadyToApply(nil)
                         return
                     }
                     originalWallpapers = backedUpWallpapers
@@ -266,7 +266,7 @@ final class LockScreenWallpaperManager {
                 }
                 guard !originalWallpapers.isEmpty
                         || originalWallpaperStoreIndex != nil else {
-                    onReadyToApply()
+                    onReadyToApply(nil)
                     return
                 }
                 try persistRecovery(
@@ -288,6 +288,7 @@ final class LockScreenWallpaperManager {
                         .appendingPathComponent("artwork-\(UUID().uuidString).jpg")
                 )
             }
+            let preferredDisplayID = displayID(for: screen)
             let renderer = renderer
 
             renderQueue.async { [weak self] in
@@ -315,7 +316,7 @@ final class LockScreenWallpaperManager {
                 guard !renderedArtwork.isEmpty else {
                     DispatchQueue.main.async { [weak self] in
                         self?.cancelFailedApply(operationID: currentOperationID)
-                        onReadyToApply()
+                        onReadyToApply(nil)
                     }
                     return
                 }
@@ -329,8 +330,10 @@ final class LockScreenWallpaperManager {
                     }
 
                     let renderedURLs = Set(renderedArtwork.map(\.url))
-
-                    onReadyToApply()
+                    let preferredBackdropURL = renderedArtwork
+                        .first { $0.displayID == preferredDisplayID }?.url
+                        ?? renderedArtwork.first?.url
+                    let preferredBackdrop = preferredBackdropURL.flatMap(NSImage.init(contentsOf:))
 
                     var didApplyAnyWallpaper = false
                     for rendered in renderedArtwork {
@@ -359,17 +362,25 @@ final class LockScreenWallpaperManager {
 
                     guard didApplyAnyWallpaper else {
                         self.cancelFailedApply(operationID: currentOperationID)
+                        onReadyToApply(nil)
                         return
                     }
 
                     self.activeArtworkURLs = renderedURLs
                     self.cleanupGeneratedArtwork(keeping: renderedURLs)
+
+                    self.waitForWallpaperFrame(
+                        matching: preferredBackdrop,
+                        displayID: preferredDisplayID,
+                        operationID: currentOperationID,
+                        onReady: onReadyToApply
+                    )
                 }
             }
         } catch {
             print("[LockScreenWallpaper] Prepare failed: \(error)")
             cancelFailedApply(operationID: currentOperationID)
-            onReadyToApply()
+            onReadyToApply(nil)
         }
     }
 
@@ -384,6 +395,106 @@ final class LockScreenWallpaperManager {
     func restoreSynchronously() {
         cancelPendingRestores()
         restoreOriginalWallpaper(allowsConfirmation: false)
+    }
+
+    private func waitForWallpaperFrame(
+        matching backdrop: NSImage?,
+        displayID: CGDirectDisplayID?,
+        operationID expectedOperationID: UUID,
+        attempt: Int = 0,
+        onReady: @escaping @MainActor (NSImage?) -> Void
+    ) {
+        guard operationID == expectedOperationID else { return }
+
+        let maximumAttempts = 12
+        if let backdrop,
+           let expectedImage = backdrop.cgImage(
+               forProposedRect: nil,
+               context: nil,
+               hints: nil
+           ),
+           let visibleImage = wallpaperWindowImage(for: displayID),
+           wallpaperFramesMatch(visibleImage, expectedImage) {
+            onReady(backdrop)
+            return
+        }
+
+        guard attempt < maximumAttempts else {
+            onReady(backdrop)
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + .milliseconds(20)
+        ) { [weak self] in
+            self?.waitForWallpaperFrame(
+                matching: backdrop,
+                displayID: displayID,
+                operationID: expectedOperationID,
+                attempt: attempt + 1,
+                onReady: onReady
+            )
+        }
+    }
+
+    private func wallpaperFramesMatch(
+        _ visibleImage: CGImage,
+        _ expectedImage: CGImage
+    ) -> Bool {
+        guard let visiblePixels = sampledPixels(from: visibleImage),
+              let expectedPixels = sampledPixels(from: expectedImage),
+              visiblePixels.count == expectedPixels.count else {
+            return false
+        }
+
+        var totalDifference = 0
+        var componentCount = 0
+        for index in stride(from: 0, to: visiblePixels.count, by: 4) {
+            for component in 0..<3 {
+                totalDifference += abs(
+                    Int(visiblePixels[index + component])
+                        - Int(expectedPixels[index + component])
+                )
+                componentCount += 1
+            }
+        }
+
+        guard componentCount > 0 else { return false }
+        return totalDifference / componentCount <= 14
+    }
+
+    private func sampledPixels(from image: CGImage) -> [UInt8]? {
+        let sampleSide = 12
+        let bytesPerRow = sampleSide * 4
+        var pixels = [UInt8](
+            repeating: 0,
+            count: sampleSide * bytesPerRow
+        )
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        let didDraw = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            guard let address = bytes.baseAddress,
+                  let context = CGContext(
+                      data: address,
+                      width: sampleSide,
+                      height: sampleSide,
+                      bitsPerComponent: 8,
+                      bytesPerRow: bytesPerRow,
+                      space: colorSpace,
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else {
+                return false
+            }
+
+            context.interpolationQuality = .medium
+            context.draw(
+                image,
+                in: CGRect(x: 0, y: 0, width: sampleSide, height: sampleSide)
+            )
+            return true
+        }
+
+        return didDraw ? pixels : nil
     }
 
     private func restoreOriginalWallpaper(allowsConfirmation: Bool = true) {

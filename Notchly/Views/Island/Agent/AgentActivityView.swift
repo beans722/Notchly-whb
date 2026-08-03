@@ -57,6 +57,11 @@ struct AgentActivityView: View {
                 .renderingMode(.original)
                 .scaledToFit()
                 .frame(width: 22, height: 22)
+        case "claude":
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color(red: 0.85, green: 0.48, blue: 0.32))
+                .frame(width: 22, height: 22)
         default:
             Image(systemName: sourceIconName)
                 .font(.system(size: 14, weight: .semibold))
@@ -73,6 +78,8 @@ struct AgentActivityView: View {
             return "terminal.fill"
         case "cursor":
             return "cursorarrow"
+        case "claude":
+            return "sparkles"
         default:
             return "sparkles"
         }
@@ -84,6 +91,8 @@ struct AgentActivityView: View {
             return Color(red: 0.50, green: 0.80, blue: 1.0)
         case "cursor":
             return Color(red: 0.62, green: 0.72, blue: 1.0)
+        case "claude":
+            return Color(red: 0.85, green: 0.48, blue: 0.32)
         default:
             return .white.opacity(0.78)
         }

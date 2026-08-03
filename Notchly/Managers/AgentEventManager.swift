@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import AppKit
+import Darwin
 
 enum AgentEventKind: String, Decodable {
     case accessRequest = "access_request"
@@ -33,6 +34,8 @@ struct AgentEvent: Identifiable, Equatable {
         switch source.lowercased() {
         case "codex":
             return "Codex"
+        case "claude":
+            return "Claude Code"
         case "cursor":
             return "Cursor"
         default:
@@ -56,7 +59,8 @@ final class AgentEventManager: ObservableObject {
 
     private let settingsManager: SettingsManager
     private let fileManager = FileManager.default
-    private var watchTask: Task<Void, Never>?
+    private var fileEventSource: DispatchSourceFileSystemObject?
+    private var fallbackWatchTask: Task<Void, Never>?
     private var clearTask: Task<Void, Never>?
     private var readOffset: UInt64 = 0
     private var lastShownEventKey: String?
@@ -109,7 +113,7 @@ final class AgentEventManager: ObservableObject {
     }
 
     func start() {
-        guard watchTask == nil else { return }
+        guard fileEventSource == nil, fallbackWatchTask == nil else { return }
 
         do {
             try ensureEventsFile()
@@ -119,19 +123,86 @@ final class AgentEventManager: ObservableObject {
             return
         }
 
-        watchTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                self?.readPendingEvents()
-                try? await Task.sleep(for: .milliseconds(500))
-            }
-        }
+        startFileWatcher()
     }
 
     func stop() {
-        watchTask?.cancel()
-        watchTask = nil
+        stopFileWatcher()
+        fallbackWatchTask?.cancel()
+        fallbackWatchTask = nil
         clearTask?.cancel()
         clearTask = nil
+    }
+
+    private func startFileWatcher() {
+        guard fileEventSource == nil else { return }
+
+        let descriptor = open(eventsFileURL.path, O_EVTONLY)
+        guard descriptor >= 0 else {
+            startFallbackWatcher()
+            return
+        }
+
+        fallbackWatchTask?.cancel()
+        fallbackWatchTask = nil
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: descriptor,
+            eventMask: [.write, .extend, .delete, .rename, .revoke],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            MainActor.assumeIsolated {
+                self?.handleFileSystemEvent()
+            }
+        }
+        source.setCancelHandler {
+            close(descriptor)
+        }
+
+        fileEventSource = source
+        source.resume()
+    }
+
+    private func stopFileWatcher() {
+        fileEventSource?.cancel()
+        fileEventSource = nil
+    }
+
+    private func handleFileSystemEvent() {
+        guard let fileEventSource else { return }
+        let event = fileEventSource.data
+
+        readPendingEvents()
+
+        let replacementEvents: DispatchSource.FileSystemEvent = [.delete, .rename, .revoke]
+        guard !event.intersection(replacementEvents).isEmpty else { return }
+
+        stopFileWatcher()
+        try? ensureEventsFile()
+        readOffset = currentFileSize()
+        startFileWatcher()
+    }
+
+    private func startFallbackWatcher() {
+        guard fallbackWatchTask == nil else { return }
+
+        fallbackWatchTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self else { return }
+                self.readPendingEvents()
+
+                // The probe descriptor is only used to see whether event watching is available.
+                let probe = open(self.eventsFileURL.path, O_EVTONLY)
+                if probe >= 0 {
+                    close(probe)
+                    self.fallbackWatchTask = nil
+                    self.startFileWatcher()
+                    return
+                }
+            }
+        }
     }
 
     private func readPendingEvents() {
@@ -229,7 +300,7 @@ final class AgentEventManager: ObservableObject {
         currentEvent = event
         eventID += 1
         debugLog("show event source=\(event.source) kind=\(event.kind.rawValue) ttl=\(event.ttl)")
-        playCodexAlertSoundIfNeeded(for: event)
+        playAgentAlertSoundIfNeeded(for: event)
 
         clearTask?.cancel()
         guard shouldAutoClear(event) else {
@@ -273,8 +344,9 @@ final class AgentEventManager: ObservableObject {
         return true
     }
 
-    private func playCodexAlertSoundIfNeeded(for event: AgentEvent) {
-        guard event.source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "codex" else { return }
+    private func playAgentAlertSoundIfNeeded(for event: AgentEvent) {
+        let source = event.source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard Self.soundEnabledSources.contains(source) else { return }
         guard event.kind != .clear else { return }
 
         switch event.kind {
@@ -307,7 +379,7 @@ final class AgentEventManager: ObservableObject {
     ) -> TimeInterval {
         let normalizedSource = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        if normalizedSource == "codex", kind == .completed {
+        if Self.soundEnabledSources.contains(normalizedSource), kind == .completed {
             return min(max(settingsManager.codexCompletedAlertDuration, 1.5), 8)
         }
 
@@ -370,12 +442,19 @@ final class AgentEventManager: ObservableObject {
 
     private static let allowedSources: Set<String> = [
         "codex",
+        "claude",
         "cursor"
     ]
 
     private static let stickyApprovalSources: Set<String> = [
         "codex",
+        "claude",
         "cursor"
+    ]
+
+    private static let soundEnabledSources: Set<String> = [
+        "codex",
+        "claude"
     ]
 
     private func ensureEventsFile() throws {

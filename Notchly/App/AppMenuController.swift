@@ -96,6 +96,14 @@ final class AppMenuController: NSObject {
         testCodexItem.target = self
         menu.addItem(testCodexItem)
 
+        let testClaudeItem = NSMenuItem(
+            title: "Test Claude Code Alert",
+            action: #selector(testClaudeAlert),
+            keyEquivalent: ""
+        )
+        testClaudeItem.target = self
+        menu.addItem(testClaudeItem)
+
         let testCursorItem = NSMenuItem(
             title: "Test Cursor Alert",
             action: #selector(testCursorAlert),
@@ -127,6 +135,16 @@ final class AppMenuController: NSObject {
             kind: .accessRequest,
             title: "Need approval",
             message: "Test alert from menu",
+            ttl: 3.0
+        )
+    }
+
+    @objc private func testClaudeAlert() {
+        agentEventManager.publish(
+            source: "claude",
+            kind: .accessRequest,
+            title: "Need approval",
+            message: "Test Claude Code alert from menu",
             ttl: 3.0
         )
     }

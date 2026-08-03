@@ -33,9 +33,11 @@ final class AppEnvironment {
     let networkStatusManager = NetworkStatusManager()
     lazy var agentEventManager = AgentEventManager(settingsManager: settingsManager)
     let codexHookIntegrationManager = CodexHookIntegrationManager()
+    let claudeHookIntegrationManager = ClaudeHookIntegrationManager()
     let cursorHookIntegrationManager = CursorHookIntegrationManager()
     let lockScreenOverlayModel = LockScreenOverlayModel()
     let lockScreenWallpaperManager = LockScreenWallpaperManager()
+    let lockScreenIdentityManager = LockScreenIdentityManager()
     let whatsNewWindow = WhatsNewWindow()
 
     lazy var updaterController = SPUStandardUpdaterController(
@@ -56,7 +58,9 @@ final class AppEnvironment {
     lazy var settingsWindow = SettingsWindow(
         settingsManager: settingsManager,
         codexHookIntegrationManager: codexHookIntegrationManager,
-        cursorHookIntegrationManager: cursorHookIntegrationManager
+        claudeHookIntegrationManager: claudeHookIntegrationManager,
+        cursorHookIntegrationManager: cursorHookIntegrationManager,
+        lockScreenIdentityManager: lockScreenIdentityManager
     )
 }
 
@@ -90,14 +94,18 @@ final class BrightnessManager: ObservableObject {
     @Published private(set) var brightnessEventID = 0
     @Published private(set) var brightnessLevel: Double = 0
 
-    private var pollingTask: Task<Void, Never>?
+    private var manualInputObserver: NSObjectProtocol?
+    private var refreshTask: Task<Void, Never>?
     private var lastPublishedLevel: Double?
+    private var handledBrightnessInputGeneration = 0
     private var cachedDisplayIDs: [CGDirectDisplayID] = []
     private var displayListRefreshTime: TimeInterval = 0
     private let displayServicesGetBrightness = BrightnessManager.loadDisplayServicesGetBrightness()
 
     func start() {
-        guard pollingTask == nil else { return }
+        guard manualInputObserver == nil else { return }
+
+        ManualSystemControlMonitor.shared.start()
 
         let initialLevel = readBrightness() ?? 0
         if brightnessLevel != initialLevel {
@@ -105,22 +113,45 @@ final class BrightnessManager: ObservableObject {
         }
         lastPublishedLevel = initialLevel
 
-        pollingTask = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-
-                if let nextLevel = self.readBrightness() {
-                    self.handleBrightnessLevel(nextLevel)
-                }
-
-                try? await Task.sleep(for: .milliseconds(220))
+        manualInputObserver = NotificationCenter.default.addObserver(
+            forName: .notchlyManualBrightnessInput,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.scheduleManualBrightnessRefresh()
             }
         }
     }
 
     func stop() {
-        pollingTask?.cancel()
-        pollingTask = nil
+        if let manualInputObserver {
+            NotificationCenter.default.removeObserver(manualInputObserver)
+            self.manualInputObserver = nil
+        }
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    private func scheduleManualBrightnessRefresh() {
+        guard refreshTask == nil else { return }
+
+        refreshTask = Task { @MainActor [weak self] in
+            // The display service applies a media-key change just after the NSEvent.
+            try? await Task.sleep(for: .milliseconds(35))
+            guard !Task.isCancelled, let self else { return }
+            if let nextLevel = self.readBrightness() {
+                self.handleBrightnessLevel(nextLevel)
+            }
+
+            // One cheap follow-up catches slower external displays without polling forever.
+            try? await Task.sleep(for: .milliseconds(110))
+            guard !Task.isCancelled else { return }
+            if let nextLevel = self.readBrightness() {
+                self.handleBrightnessLevel(nextLevel)
+            }
+            self.refreshTask = nil
+        }
     }
 
     private func handleBrightnessLevel(_ nextLevel: Double) {
@@ -136,9 +167,13 @@ final class BrightnessManager: ObservableObject {
         brightnessLevel = nextLevel
         self.lastPublishedLevel = nextLevel
 
-        if delta >= 0.01 {
-            brightnessEventID += 1
-        }
+        guard delta >= 0.01,
+              let inputGeneration = ManualSystemControlMonitor.shared.recentBrightnessInput(
+                after: handledBrightnessInputGeneration
+              ) else { return }
+
+        handledBrightnessInputGeneration = inputGeneration
+        brightnessEventID += 1
     }
 
     private func readBrightness() -> Double? {

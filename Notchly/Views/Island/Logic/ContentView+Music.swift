@@ -105,7 +105,7 @@ extension ContentView {
                     showsPercent: settingsManager.showBrightnessPercent,
                     size: layout.brightnessPreviewSize
                 )
-                .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                .transition(.identity)
                 .zIndex(4)
             }
 
@@ -118,7 +118,7 @@ extension ContentView {
                     showsPercent: settingsManager.showSoundPercent,
                     size: layout.volumePreviewSize
                 )
-                .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                .transition(.identity)
                 .zIndex(4)
             }
 
