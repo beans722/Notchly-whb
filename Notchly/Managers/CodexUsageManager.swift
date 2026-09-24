@@ -31,7 +31,7 @@ final class CodexUsageManager: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 if self.settingsManager.enableCodexUsageSync { await self.refreshIfNeeded() }
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(300))
             }
         }
     }

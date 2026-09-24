@@ -68,6 +68,18 @@ Enable it in **Settings → Codex**:
 
 - macOS 14.6 or newer.
 
+## V1 Test Download
+
+[Download the Apple silicon DMG](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-arm64.dmg).
+[Verify its SHA-256 checksum](Notchly-V1-arm64.dmg.sha256).
+Drag Notchly into Applications to install it.
+
+This test build is ad-hoc signed and **not notarized by Apple**. macOS may warn
+or block it on first launch. Only proceed if you trust this repository and have
+verified the downloaded file; otherwise, do not override Gatekeeper. See
+[Apple's safety guidance](https://support.apple.com/en-by/102445). The app is
+arm64 only. Quota sync is off by default and requires explicit opt-in.
+
 ## Build From Source
 
 ```sh
