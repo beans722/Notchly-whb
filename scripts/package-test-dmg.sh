@@ -45,6 +45,7 @@ xcodebuild \
   CODE_SIGN_IDENTITY=- \
   CODE_SIGNING_ALLOWED=YES \
   CODE_SIGNING_REQUIRED=YES \
+  ENABLE_HARDENED_RUNTIME=NO \
   DEVELOPMENT_TEAM= \
   MACOSX_DEPLOYMENT_TARGET=14.6 \
   build
@@ -87,4 +88,4 @@ hdiutil verify "$DMG_PATH"
 )
 
 printf '\nCreated and verified:\n  %s\n  %s.sha256\n' "$DMG_PATH" "$DMG_PATH"
-printf 'The app is ad-hoc signed and not notarized. Verify the checksum before sharing.\n'
+printf 'The app is ad-hoc signed, not notarized, and does not use Hardened Runtime. Verify the checksum before sharing.\n'

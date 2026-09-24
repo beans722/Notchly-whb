@@ -102,9 +102,15 @@ The script resolves the pinned Swift packages, builds a Release `.app` for the
 current Mac architecture (`arm64` or `x86_64`), verifies its signature and
 minimum macOS version, and creates a drag-to-Applications DMG plus a SHA-256
 file under `build/dist/`. It uses an ad-hoc signature, so no paid Apple
-Developer account or personal Team ID is needed. The resulting app is not
-notarized; macOS may require a one-time manual approval in System Settings →
-Privacy & Security. Only approve a build you compiled yourself or verified.
+Developer account or personal Team ID is needed. To let macOS load the bundled
+MediaRemoteAdapter framework without a matching Apple Team ID, this specific
+test build disables Hardened Runtime (and therefore Library Validation). This
+reduces runtime protections against code injection; use it only for a build you
+compiled yourself or otherwise fully trust. The resulting app is not notarized;
+macOS may also require a one-time manual approval in System Settings → Privacy &
+Security. This setting applies only to the no-account packaging script; normal
+Xcode builds retain the target's Hardened Runtime setting and should use the
+same development team to sign the app and embedded frameworks.
 
 To build for an Intel Mac from Apple silicon, run
 `NOTCHLY_ARCH=x86_64 bash scripts/package-test-dmg.sh`. To build for Apple
