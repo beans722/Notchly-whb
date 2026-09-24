@@ -16,41 +16,8 @@ final class BatteryManager: ObservableObject {
     @Published var isBatteryAvailable: Bool = true
     @Published var powerSource: String = "Unknown"
 
-    private var timer: Timer?
-    private let musicManager: MusicManager
-
-    init(musicManager: MusicManager) {
-        self.musicManager = musicManager
-
-        updateBatteryInfo()
-        startMonitoring()
-    }
-
-    deinit {
-        timer?.invalidate()
-    }
-
-    func startMonitoring() {
-        timer?.invalidate()
-
-        let timer = Timer(timeInterval: 15.0, repeats: true) { [weak self] _ in
-            guard let self else { return }
-
-            guard !self.shouldPauseBatteryUpdates else {
-                return
-            }
-
-            self.updateBatteryInfo()
-        }
-
-        timer.tolerance = 3.0
-        self.timer = timer
-        RunLoop.main.add(timer, forMode: .common)
-    }
-
-    private var shouldPauseBatteryUpdates: Bool {
-        musicManager.hasNowPlayingContent
-    }
+    // Battery indicators are not part of Notchly's focused Apple Music/Codex
+    // experience, so this manager intentionally performs no background polling.
 
     func updateBatteryInfo() {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),

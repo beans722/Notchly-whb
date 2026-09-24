@@ -9,14 +9,12 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let environment = AppEnvironment()
+    let environment = AppEnvironment()
     private var startupTask: Task<Void, Never>?
     private var didValidateSingleInstance = false
 
     private lazy var menuController = AppMenuController(
         settingsWindow: environment.settingsWindow,
-        whatsNewWindow: environment.whatsNewWindow,
-        updaterController: environment.updaterController,
         agentEventManager: environment.agentEventManager
     )
 
@@ -37,8 +35,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         guard validateSingleRunningInstance() else { return }
-        environment.lockScreenWallpaperManager.recoverSynchronously()
-        environment.lockScreenWallpaperManager.refreshCachedDesktopWallpapers()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,43 +45,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuController.install()
         environment.agentEventManager.start()
         environment.musicManager.start()
-        environment.networkStatusManager.start()
+        environment.appleMusicLyricsManager.start()
+        environment.codexUsageManager.start()
         overlayController.show()
-        environment.lockScreenWallpaperManager.startDesktopWallpaperMonitoring()
-        environment.lockScreenIdentityManager.start(
-            observing: environment.lockScreenOverlayModel
-        )
-
-        startupTask?.cancel()
-        startupTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled else { return }
-            self.environment.focusManager.start()
-            self.lockScreenController.start()
-
-            try? await Task.sleep(for: .milliseconds(350))
-            guard !Task.isCancelled else { return }
-            self.environment.brightnessManager.start()
-            self.environment.whatsNewWindow.showIfNeeded()
-            self.startupTask = nil
-        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         startupTask?.cancel()
         startupTask = nil
         environment.musicManager.stop()
+        environment.appleMusicLyricsManager.stop()
+        environment.codexUsageManager.stop()
         environment.agentEventManager.stop()
-        environment.focusManager.stop()
-        environment.brightnessManager.stop()
-        environment.networkStatusManager.stop()
-        environment.lockScreenWallpaperManager.stopDesktopWallpaperMonitoring()
-        environment.lockScreenIdentityManager.stop()
-        lockScreenController.stop()
         overlayController.stop()
-        environment.lockScreenWallpaperManager.restoreSynchronously()
     }
 
     @discardableResult

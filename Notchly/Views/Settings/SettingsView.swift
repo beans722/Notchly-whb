@@ -10,20 +10,17 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
-    @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
-    @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
-    @ObservedObject var lockScreenIdentityManager: LockScreenIdentityManager
-    @State private var selectedSection: SettingsSection = .about
-    @State private var searchText = ""
+    @ObservedObject var codexUsageManager: CodexUsageManager
+    @State private var selectedSection: SettingsSection = .music
 
     var body: some View {
         HStack(spacing: 0) {
             sidebar
-                .frame(width: 220)
+                .frame(width: 190)
 
             detail
         }
-        .frame(width: 860, height: 680, alignment: .top)
+        .frame(width: 760, height: 560, alignment: .top)
         .background(SettingsBackground())
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .ignoresSafeArea(.container, edges: .top)
@@ -31,17 +28,8 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
-            searchField
-
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
-                    sidebarButton(.general)
-
-                    sidebarGroup(
-                        title: "Notifications",
-                        sections: [.focus, .brightness, .sound, .battery]
-                    )
-
                     sidebarGroup(
                         title: "Live Activities",
                         sections: [.music, .codex]
@@ -57,7 +45,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.top, 46)
+        .padding(.top, 34)
         .padding(.bottom, 16)
         .background(.black.opacity(0.12))
         .overlay(alignment: .trailing) {
@@ -86,37 +74,6 @@ struct SettingsView: View {
 
     private var topBar: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 0) {
-                Button {
-                    selectPreviousSection()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 32, height: 36)
-                }
-
-                Divider()
-                    .frame(height: 20)
-                    .opacity(0.35)
-
-                Button {
-                    selectNextSection()
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 32, height: 36)
-                }
-            }
-            .buttonStyle(SubtleHoverButtonStyle(
-                pressedScale: 0.94,
-                hoverScale: 1.05,
-                hoverBackgroundOpacity: 0.08,
-                cornerRadius: 14
-            ))
-            .foregroundStyle(.secondary)
-            .background(.black.opacity(0.16))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-
             VStack(alignment: .leading) {
                 Text(selectedSection.rawValue)
                     .font(.system(size: 15, weight: .medium))
@@ -162,22 +119,6 @@ struct SettingsView: View {
         }
     }
 
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 15, weight: .medium))
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 36)
-        .background(.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
     private func sidebarGroup(title: String, sections: [SettingsSection]) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title)
@@ -185,7 +126,7 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 8)
 
-            ForEach(sections.filter(matchesSearch)) { section in
+            ForEach(sections) { section in
                 sidebarButton(section)
             }
         }
@@ -226,24 +167,6 @@ struct SettingsView: View {
     @ViewBuilder
     private var selectedContent: some View {
         switch selectedSection {
-        case .general:
-            GeneralSettingsView(
-                settingsManager: settingsManager,
-                lockScreenIdentityManager: lockScreenIdentityManager
-            )
-
-        case .focus:
-            FocusSettingsView(settingsManager: settingsManager)
-
-        case .brightness:
-            BrightnessSettingsView(settingsManager: settingsManager)
-
-        case .sound:
-            SoundSettingsView(settingsManager: settingsManager)
-
-        case .battery:
-            BatterySettingsView(settingsManager: settingsManager)
-
         case .music:
             MusicSettingsView(settingsManager: settingsManager)
 
@@ -251,8 +174,7 @@ struct SettingsView: View {
             CodexSettingsView(
                 settingsManager: settingsManager,
                 codexHookIntegrationManager: codexHookIntegrationManager,
-                claudeHookIntegrationManager: claudeHookIntegrationManager,
-                cursorHookIntegrationManager: cursorHookIntegrationManager
+                codexUsageManager: codexUsageManager
             )
             
         case .about:
@@ -260,49 +182,11 @@ struct SettingsView: View {
           }
     }
 
-    private func matchesSearch(_ section: SettingsSection) -> Bool {
-        searchText.isEmpty ||
-        section.rawValue.localizedCaseInsensitiveContains(searchText) ||
-        section.subtitle.localizedCaseInsensitiveContains(searchText)
-    }
-
-    private func selectPreviousSection() {
-        let sections = SettingsSection.allCases
-        guard let index = sections.firstIndex(of: selectedSection) else { return }
-
-        let previousIndex = index == sections.startIndex
-            ? sections.index(before: sections.endIndex)
-            : sections.index(before: index)
-
-        selectedSection = sections[previousIndex]
-    }
-
-    private func selectNextSection() {
-        let sections = SettingsSection.allCases
-        guard let index = sections.firstIndex(of: selectedSection) else { return }
-
-        let nextIndex = sections.index(after: index) == sections.endIndex
-            ? sections.startIndex
-            : sections.index(after: index)
-
-        selectedSection = sections[nextIndex]
-    }
-
     private func resetSelectedSection() {
         withAnimation(.easeInOut(duration: 0.18)) {
             switch selectedSection {
             case .about:
                 break
-            case .general:
-                settingsManager.resetGeneralSettings()
-            case .focus:
-                settingsManager.resetFocusSettings()
-            case .brightness:
-                settingsManager.resetBrightnessSettings()
-            case .sound:
-                settingsManager.resetSoundSettings()
-            case .battery:
-                settingsManager.resetBatterySettings()
             case .music:
                 settingsManager.resetMusicSettings()
             case .codex:

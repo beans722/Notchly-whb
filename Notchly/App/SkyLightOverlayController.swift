@@ -620,6 +620,8 @@ final class SkyLightOverlayController {
             settingsManager: environment.settingsManager,
             dynamicManager: environment.dynamicManager,
             musicManager: environment.musicManager,
+            appleMusicLyricsManager: environment.appleMusicLyricsManager,
+            codexUsageManager: environment.codexUsageManager,
             focusManager: environment.focusManager,
             brightnessManager: environment.brightnessManager,
             networkStatusManager: environment.networkStatusManager,

@@ -57,14 +57,29 @@ extension ContentView {
                 (status == .focusCollapse && focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) ||
                 (status == .brightnessCollapse && brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) ||
                 (status == .volumeCollapse && volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn)) {
-                CompactMusicView(
-                    artwork: musicManager.artworkImage,
-                    waveformColor: musicManager.waveformColor,
-                    isPlaying: isWaveformActive,
-                    size: layout.closedSize,
-                    hoverOffsetY: hoverOffsetY,
-                    skipIndicator: skipIndicator
-                )
+                Group {
+                    if agentEventManager.showsBackgroundCodexActivity {
+                        CodexBackgroundActivityStatusView(
+                            size: layout.closedSize,
+                            notchWidth: min(configuredIdleIslandWidth, layout.closedSize.width),
+                            fiveHourText: codexUsageManager.fiveHour.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
+                            weeklyText: codexUsageManager.weekly.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
+                            showsUsage: settingsManager.enableCodexUsageSync
+                        )
+                    } else {
+                        CompactMusicView(
+                            artwork: musicManager.artworkImage,
+                            waveformColor: musicManager.waveformColor,
+                            isPlaying: isWaveformActive,
+                            size: layout.closedSize,
+                            hoverOffsetY: hoverOffsetY,
+                            skipIndicator: skipIndicator,
+                            fiveHourUsage: codexUsageManager.fiveHour,
+                            weeklyUsage: codexUsageManager.weekly,
+                            showsUsage: settingsManager.enableCodexUsageSync
+                        )
+                    }
+                }
                 .allowsHitTesting(false)
                 .transition(.opacity)
                 .zIndex(1)
@@ -142,6 +157,10 @@ extension ContentView {
                     title: musicManager.trackTitle,
                     artist: musicManager.artistName,
                     sourceName: musicManager.sourceName,
+                    lyricLine: appleMusicLyricsManager.currentLine,
+                    fiveHourUsage: codexUsageManager.fiveHour,
+                    weeklyUsage: codexUsageManager.weekly,
+                    showsUsage: settingsManager.enableCodexUsageSync,
                     isPlaying: musicManager.isPlaying,
                     isShuffleEnabled: musicManager.isShuffleEnabled,
                     isShuffleControlAvailable: musicManager.isShuffleControlAvailable,

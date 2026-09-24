@@ -13,6 +13,8 @@ struct ContentView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var dynamicManager: DynamicManager
     @ObservedObject var musicManager: MusicManager
+    @ObservedObject var appleMusicLyricsManager: AppleMusicLyricsManager
+    @ObservedObject var codexUsageManager: CodexUsageManager
     @ObservedObject var focusManager: FocusManager
     @ObservedObject var brightnessManager: BrightnessManager
     @ObservedObject var networkStatusManager: NetworkStatusManager

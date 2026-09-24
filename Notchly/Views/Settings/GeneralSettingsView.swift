@@ -201,96 +201,62 @@ private struct UnlockSoundSettingsRow: View {
 struct CodexSettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
     @ObservedObject var codexHookIntegrationManager: CodexHookIntegrationManager
-    @ObservedObject var claudeHookIntegrationManager: ClaudeHookIntegrationManager
-    @ObservedObject var cursorHookIntegrationManager: CursorHookIntegrationManager
+    @ObservedObject var codexUsageManager: CodexUsageManager
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             SettingsCard {
                 VStack(spacing: 0) {
                     AgentHookIntegrationRow(
-                        title: "Codex Alerts",
+                        title: "Codex Live Activity",
                         manager: codexHookIntegrationManager,
-                        description: "Shows Codex approval and completion alerts using transparent local hooks."
+                        description: "Shows Codex beside the notch only while a task runs in the background. Hooks store status and IDs locally, never prompt text."
                     )
 
                     SettingsDivider()
 
-                    AgentHookIntegrationRow(
-                        title: "Claude Code Alerts",
-                        manager: claudeHookIntegrationManager,
-                        description: "Shows approval, waiting, completion, and failure alerts from Claude Code terminal sessions."
+                    SettingsToggleRow(
+                        title: "Codex Usage Sync",
+                        subtitle: "Reads ~/.codex/auth.json locally and requests limits from chatgpt.com at most every five minutes. Off means no usage requests.",
+                        isOn: $settingsManager.enableCodexUsageSync
                     )
 
                     SettingsDivider()
-
-                    AgentHookIntegrationRow(
-                        title: "Cursor Alerts",
-                        manager: cursorHookIntegrationManager,
-                        description: "Shows Cursor shell approval and completion alerts using local Cursor hooks."
-                    )
-
-                    SettingsDivider()
-
-                    CodexAlertSoundSettingsRow(
-                        title: "Need Approval Sound",
-                        subtitle: "Play a subtle sound when an AI agent is waiting for approval.",
-                        kind: .accessRequest,
-                        isEnabled: $settingsManager.enableCodexApprovalAlertSound
-                    )
-
-                    SettingsDivider()
-
-                    CodexAlertSoundSettingsRow(
-                        title: "Task Completed Sound",
-                        subtitle: "Play a subtle sound when an AI agent finishes a task.",
-                        kind: .completed,
-                        isEnabled: $settingsManager.enableCodexCompletedAlertSound
-                    )
-
-                    SettingsDivider()
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Job Done Duration")
-                                    .font(.system(size: 13, weight: .medium))
-
-                                Text("How long AI agent completion alerts stay visible before returning to music.")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            Text(String(format: "%.1fs", settingsManager.codexCompletedAlertDuration))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-
-                        Slider(
-                            value: $settingsManager.codexCompletedAlertDuration,
-                            in: 1.5...6.0,
-                            step: 0.1
-                        )
+                    HStack {
+                        Text("5-hour: \(usageLabel(codexUsageManager.fiveHour))")
+                        Spacer()
+                        Text("Weekly: \(usageLabel(codexUsageManager.weekly))")
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .font(.system(size: 13, weight: .medium))
+                    .monospacedDigit()
+                    .padding(14)
+
+                    if settingsManager.enableCodexUsageSync,
+                       let message = codexUsageManager.errorMessage {
+                        Text(message)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 10)
+                    }
+
                 }
             }
         }
         .onAppear {
             codexHookIntegrationManager.refreshStatus()
-            claudeHookIntegrationManager.refreshStatus()
-            cursorHookIntegrationManager.refreshStatus()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             codexHookIntegrationManager.refreshStatus()
-            claudeHookIntegrationManager.refreshStatus()
-            cursorHookIntegrationManager.refreshStatus()
+        }
+        .onChange(of: settingsManager.enableCodexUsageSync) { _, enabled in
+            if enabled { Task { await codexUsageManager.refreshIfNeeded() } }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func usageLabel(_ window: CodexUsageWindow) -> String {
+        window.visiblePercent.map { "\(Int(($0 * 100).rounded()))% used" } ?? "Unavailable"
     }
 }
 

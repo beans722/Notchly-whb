@@ -13,7 +13,11 @@ struct DynamicIslandApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsView(
+                settingsManager: appDelegate.environment.settingsManager,
+                codexHookIntegrationManager: appDelegate.environment.codexHookIntegrationManager,
+                codexUsageManager: appDelegate.environment.codexUsageManager
+            )
         }
     }
 }

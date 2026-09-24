@@ -9,5 +9,6 @@ enum IslandModule {
     case agent
     case battery
     case music
+    case usage
     case none
 }

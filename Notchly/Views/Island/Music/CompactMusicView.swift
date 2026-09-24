@@ -15,6 +15,9 @@ struct CompactMusicView: View {
     let size: CGSize
     let hoverOffsetY: CGFloat
     let skipIndicator: String?
+    let fiveHourUsage: CodexUsageWindow
+    let weeklyUsage: CodexUsageWindow
+    let showsUsage: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -34,6 +37,15 @@ struct CompactMusicView: View {
 
             Spacer()
 
+            if showsUsage {
+                Text("5h \(format(fiveHourUsage))  7d \(format(weeklyUsage))")
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
             MusicWaveformView(
                 isPlaying: isPlaying,
                 color: waveformColor,
@@ -44,5 +56,9 @@ struct CompactMusicView: View {
         .padding(.horizontal, 12)
         .frame(width: size.width, height: size.height)
         .offset(y: hoverOffsetY)
+    }
+
+    private func format(_ window: CodexUsageWindow) -> String {
+        window.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—"
     }
 }

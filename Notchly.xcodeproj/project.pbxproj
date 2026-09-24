@@ -11,7 +11,6 @@
 		A10000022FA1000100A10002 /* xyz.notchly.Notchly.IdentityHelper.plist in Embed LaunchDaemon */ = {isa = PBXBuildFile; fileRef = A10000042FA1000100A10004 /* xyz.notchly.Notchly.IdentityHelper.plist */; };
 		CE09F2B32F7D845B0088ADC6 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = CE09F2B22F7D845B0088ADC6 /* SkyLightWindow */; };
 		CE30A0C22F71B03C006A3998 /* MediaRemoteAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = CE30A0C12F71B03C006A3998 /* MediaRemoteAdapter */; };
-		CE30A0FE2F740A96006A3998 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = CE30A0FD2F740A96006A3998 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,7 +107,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CE30A0FE2F740A96006A3998 /* Sparkle in Frameworks */,
 				CE09F2B32F7D845B0088ADC6 /* SkyLightWindow in Frameworks */,
 				CE30A0C22F71B03C006A3998 /* MediaRemoteAdapter in Frameworks */,
 			);
@@ -201,7 +199,6 @@
 			name = Notchly;
 			packageProductDependencies = (
 				CE30A0C12F71B03C006A3998 /* MediaRemoteAdapter */,
-				CE30A0FD2F740A96006A3998 /* Sparkle */,
 				CE09F2B22F7D845B0088ADC6 /* SkyLightWindow */,
 			);
 			productName = DynamicIsland;
@@ -237,7 +234,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CE30A0C02F71B03C006A3998 /* XCRemoteSwiftPackageReference "mediaremote-adapter" */,
-				CE30A0FC2F740A96006A3998 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				CE09F2B12F7D845B0088ADC6 /* XCRemoteSwiftPackageReference "SkyLightWindow" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -302,7 +298,7 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 9M69D4JTGX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Notchly Identity Helper";
@@ -325,7 +321,7 @@
 				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 9M69D4JTGX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Notchly Identity Helper";
@@ -471,7 +467,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 18;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 9M69D4JTGX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -498,7 +494,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Notchly;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSMultipleInstancesProhibited = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Notchly needs access to control Spotify playback options like shuffle and repeat.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Notchly needs permission to control Apple Music playback.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -547,7 +543,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 18;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 9M69D4JTGX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -574,7 +570,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Notchly;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSMultipleInstancesProhibited = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Notchly needs access to control Spotify playback options like shuffle and repeat.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Notchly needs permission to control Apple Music playback.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -659,14 +655,6 @@
 				kind = branch;
 			};
 		};
-		CE30A0FC2F740A96006A3998 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.9.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -679,11 +667,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CE30A0C02F71B03C006A3998 /* XCRemoteSwiftPackageReference "mediaremote-adapter" */;
 			productName = MediaRemoteAdapter;
-		};
-		CE30A0FD2F740A96006A3998 /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CE30A0FC2F740A96006A3998 /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

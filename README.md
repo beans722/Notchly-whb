@@ -5,17 +5,13 @@
 <h1 align="center">Notchly</h1>
 
 <p align="center">
-  Turn your MacBook notch into a useful, interactive space.
+  A privacy-focused community fork for Apple Music and Codex background tasks.
 </p>
 
 <p align="center">
-  <a href="https://notchly.xyz"><strong>Website</strong></a>
+  <a href="https://github.com/Notchly/Notchly"><strong>Original project</strong></a>
   ·
-  <a href="https://github.com/Notchly/Notchly/releases/latest"><strong>Download</strong></a>
-  ·
-  <a href="https://cdn.notchly.xyz/notchly-preview.mp4"><strong>Preview</strong></a>
-  ·
-  <a href="https://x.com/i/status/2061860955928100956"><strong>Codex Alerts</strong></a>
+  <a href="https://github.com/beans722/Notchly-whb"><strong>This fork</strong></a>
   ·
   <a href="docs/ARCHITECTURE.md"><strong>Architecture</strong></a>
 </p>
@@ -24,103 +20,80 @@
   <img src="https://img.shields.io/badge/macOS-14.6%2B-black?style=flat-square&logo=apple" alt="macOS 14.6+">
   <img src="https://img.shields.io/badge/SwiftUI-Native-orange?style=flat-square&logo=swift" alt="Native SwiftUI app">
   <img src="https://img.shields.io/badge/Privacy-Friendly-green?style=flat-square" alt="Privacy friendly">
-  <a href="https://github.com/Notchly/Notchly/releases/latest">
-    <img alt="Latest release" src="https://img.shields.io/github/v/release/Notchly/Notchly?style=flat-square&label=release">
+  <a href="https://github.com/beans722/Notchly-whb/blob/main/LICENSE">
+    <img alt="License" src="https://img.shields.io/github/license/beans722/Notchly-whb?style=flat-square">
   </a>
-  <a href="https://github.com/Notchly/Notchly/blob/main/LICENSE">
-    <img alt="License" src="https://img.shields.io/github/license/Notchly/Notchly?style=flat-square">
-  </a>
-  <a href="https://github.com/Notchly/Notchly/stargazers">
-    <img alt="GitHub stars" src="https://img.shields.io/github/stars/Notchly/Notchly?style=flat-square">
-  </a>
-  <a href="https://github.com/Notchly/Notchly/releases">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/Notchly/Notchly/total?style=flat-square">
-  </a>
-</p>
-
-<p align="center">
-  If Notchly makes your Mac feel better, please
-  <a href="https://github.com/Notchly/Notchly/stargazers"><strong>star the project</strong></a>.
 </p>
 
 ---
 
 ## Notchly
 
-**Notchly** is a lightweight native macOS app that turns the MacBook notch into a compact control surface.
-
-It adds music controls, battery status, lock screen support, focus animations, gestures, smooth transitions, and Codex AI alerts around the notch.
-
-## Preview
-
-<p align="center">
-
-<img width="1920" height="1080" alt="s-preview" src="https://github.com/user-attachments/assets/4a3fb21b-0261-441e-bdf0-afe69f9cb342" />
-
-</p>
+**Notchly-whb** is a community fork of [Notchly](https://github.com/Notchly/Notchly). This build focuses on Apple Music and local lyrics, plus Codex background-task status and optional usage-limit display.
 
 ## Highlights
 
-- Music controls for Spotify, Apple Music, and supported media sources.
-- Battery and charging indicators.
-- Lock screen music controls.
-- Focus mode animations.
-- Swipe gestures for quick interactions.
-- Multi-display behavior for primary screen setups.
-- Codex AI alerts for approval and task completion events.
-- Local-first design with no personal data collection.
+- Apple Music playback controls and the currently playing track.
+- Optional lyric reading from the visible Music app interface using macOS Accessibility; lyrics stay on this Mac.
+- Codex background-task status shown beside the physical notch only while Codex is not frontmost.
+- Optional five-hour and weekly usage windows, refreshed at most every five minutes.
+- Local Codex activity hooks store status and IDs, never prompt text.
 
 ## Codex AI Alerts
 
-Notchly can show alerts for Codex sessions.
+Quota sync is **off by default**. In Settings → Codex, enable **Codex Usage Sync**
+to show the five-hour and weekly usage windows. Notchly reads the existing
+access token from `~/.codex/auth.json` and sends it only to
+`https://chatgpt.com/backend-api/wham/usage`, at most once every five minutes.
+The token is not copied to app preferences or logs. This endpoint is undocumented
+and may change; a window not returned by the service displays as unavailable.
+
+The quota endpoint and window-routing approach were adapted from
+[CodexIsland](https://github.com/ericjypark/codex-island), © 2026 Eric Park,
+licensed under MIT. See `THIRD_PARTY_NOTICES.md`.
+
+The left side shows Codex's running state only while a task is active and Codex
+is not frontmost. The right side reserves space for both quota windows. The
+physical camera cutout is measured from the display and kept free of text.
+Lifecycle hooks store only local status, session ID, turn ID, and timestamp;
+they discard prompt text. A stale active task expires after two hours without
+another hook event, so very long silent runs may disappear temporarily.
 
 Enable it in **Settings → Codex**:
 
-1. Turn on **Codex Alerts**.
-2. Enable **Need Approval Sound** if you want approval alerts.
-3. Enable **Task Completed Sound** if you want completion alerts.
-4. Restart Codex so the local Stop hook can send completion events to Notchly.
-
-Preview: https://x.com/i/status/2061860955928100956
+1. Install the **Codex Live Activity** hook.
+2. Review the hook entries in Codex and start a new task.
 
 ## Requirements
 
 - macOS 14.6 or newer.
 
-## Installation
-
-1. Download the latest DMG from [Releases](https://github.com/Notchly/Notchly/releases/latest).
-2. Open the DMG.
-3. Move Notchly to Applications.
-4. Launch Notchly.
-
-macOS may ask for Automation permission when using Spotify or Apple Music controls.
-
-## Settings
-
-- General behavior, launch at login, lock sound, and focus animations.
-- Battery visibility and low-battery threshold.
-- Music preview timing and AppleScript controls.
-- Primary-display behavior for multi-monitor setups.
-- Codex alerts, approval sound, task completed sound, and alert duration.
-
 ## Build From Source
 
 ```sh
-git clone git@github.com:Notchly/Notchly.git
-cd Notchly
+git clone https://github.com/beans722/Notchly-whb.git
+cd Notchly-whb
 open Notchly.xcodeproj
 ```
 
-Or build from the command line:
+In Xcode, select the **Notchly** target → **Signing & Capabilities** and choose
+your own Apple development team. Do not add a personal Team ID to the shared
+project. Then build and run with **Product → Run**. On first launch:
+
+- Grant Accessibility access only if you want local Apple Music lyrics.
+- Install the Codex Live Activity hook from Settings → Codex.
+- Leave Codex Usage Sync off unless you want to send the existing Codex access
+  token to the endpoint above.
+
+For command-line builds, supply your own team identifier:
 
 ```sh
-xcodebuild -project Notchly.xcodeproj -scheme Notchly -configuration Debug build
+xcodebuild -project Notchly.xcodeproj -scheme Notchly -configuration Release \
+  DEVELOPMENT_TEAM=YOUR_TEAM_ID -allowProvisioningUpdates build
 ```
 
 ## Dependencies
 
-- [Sparkle](https://sparkle-project.org/) for app updates.
 - [SkyLightWindow](https://github.com/Lakr233/SkyLightWindow) for overlay windows.
 - [mediaremote-adapter](https://github.com/ejbills/mediaremote-adapter) for Now Playing / MediaRemote access.
 
@@ -134,4 +107,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Notchly is released under the MIT License. See [LICENSE](LICENSE).
+This fork is released under the MIT License. See [LICENSE](LICENSE) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for required attribution.

@@ -50,12 +50,19 @@ private struct AgentEventPayload: Decodable {
     let title: String?
     let message: String?
     let ttl: TimeInterval?
+    let session_id: String?
+    let turn_id: String?
+    let timestamp: TimeInterval?
 }
 
 @MainActor
 final class AgentEventManager: ObservableObject {
     @Published private(set) var currentEvent: AgentEvent?
     @Published private(set) var eventID = 0
+    @Published private(set) var isCodexRunning = false
+    @Published private(set) var isCodexForeground = false
+
+    var showsBackgroundCodexActivity: Bool { isCodexRunning && !isCodexForeground }
 
     private let settingsManager: SettingsManager
     private let fileManager = FileManager.default
@@ -66,6 +73,9 @@ final class AgentEventManager: ObservableObject {
     private var lastShownEventKey: String?
     private var lastShownEventDate: Date?
     private var lastCompactionDate: Date?
+    private var activeCodexTurns: [String: Date] = [:]
+    private var appActivationObserver: NSObjectProtocol?
+    private var activityExpiryTask: Task<Void, Never>?
     private let maxEventsFileSizeBytes: UInt64 = 512 * 1024
     private let maxEventsFileLines = 1200
     private let minCompactionInterval: TimeInterval = 30
@@ -115,9 +125,26 @@ final class AgentEventManager: ObservableObject {
     func start() {
         guard fileEventSource == nil, fallbackWatchTask == nil else { return }
 
+        refreshForegroundApp()
+        appActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshForegroundApp() }
+        }
+        activityExpiryTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                self?.expireStaleCodexTurns()
+            }
+        }
+
         do {
             try ensureEventsFile()
             compactEventsFileIfNeeded(force: true)
+            restoreRecentCodexActivity()
             readOffset = currentFileSize()
         } catch {
             return
@@ -132,6 +159,12 @@ final class AgentEventManager: ObservableObject {
         fallbackWatchTask = nil
         clearTask?.cancel()
         clearTask = nil
+        activityExpiryTask?.cancel()
+        activityExpiryTask = nil
+        if let appActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
+            self.appActivationObserver = nil
+        }
     }
 
     private func startFileWatcher() {
@@ -240,13 +273,61 @@ final class AgentEventManager: ObservableObject {
 
         rawText
             .split(whereSeparator: \.isNewline)
-            .compactMap { line -> AgentEvent? in
+            .compactMap { line -> AgentEventPayload? in
                 let text = line.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty, let lineData = text.data(using: .utf8) else { return nil }
-                guard let payload = try? JSONDecoder().decode(AgentEventPayload.self, from: lineData) else { return nil }
-                return makeEvent(from: payload)
+                return try? JSONDecoder().decode(AgentEventPayload.self, from: lineData)
             }
-            .forEach(showEvent)
+            .forEach { payload in
+                updateCodexActivity(from: payload)
+                guard let kind = payload.type else { return }
+                if payload.source?.lowercased() == "codex" {
+                    switch kind {
+                    case .started, .progress, .cancelled:
+                        if kind == .progress { clearCurrentEvent(for: "codex") }
+                        return
+                    default: break
+                    }
+                }
+                if let event = makeEvent(from: payload) { showEvent(event) }
+            }
+    }
+
+    private func refreshForegroundApp() {
+        isCodexForeground = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.openai.codex"
+    }
+
+    private func restoreRecentCodexActivity() {
+        guard let data = try? Data(contentsOf: eventsFileURL),
+              let text = String(data: data, encoding: .utf8) else { return }
+        for line in text.split(whereSeparator: \.isNewline).suffix(1200) {
+            guard let payload = try? JSONDecoder().decode(AgentEventPayload.self, from: Data(line.utf8)),
+                  let timestamp = payload.timestamp,
+                  Date().timeIntervalSince1970 - timestamp < 7200 else { continue }
+            updateCodexActivity(from: payload)
+        }
+    }
+
+    private func updateCodexActivity(from payload: AgentEventPayload) {
+        guard payload.source?.lowercased() == "codex",
+              let kind = payload.type,
+              let sessionID = payload.session_id, !sessionID.isEmpty else { return }
+        let key = sessionID + ":" + (payload.turn_id ?? "")
+        let now = payload.timestamp.map(Date.init(timeIntervalSince1970:)) ?? Date()
+        switch kind {
+        case .started, .progress, .accessRequest, .waiting:
+            activeCodexTurns[key] = now
+        case .completed, .failed, .cancelled:
+            activeCodexTurns.removeValue(forKey: key)
+        case .clear:
+            break
+        }
+        expireStaleCodexTurns()
+    }
+
+    private func expireStaleCodexTurns() {
+        activeCodexTurns = activeCodexTurns.filter { Date().timeIntervalSince($0.value) < 7200 }
+        isCodexRunning = !activeCodexTurns.isEmpty
     }
 
     private func makeEvent(from payload: AgentEventPayload) -> AgentEvent? {

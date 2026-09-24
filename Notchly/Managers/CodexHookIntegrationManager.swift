@@ -27,6 +27,11 @@ final class CodexHookIntegrationManager: ObservableObject {
         hooks = true
 
         # Notchly Codex alerts
+        [[hooks.UserPromptSubmit]]
+        [[hooks.UserPromptSubmit.hooks]]
+        type = "command"
+        command = '\(startedHookCommand)'
+
         [[hooks.Stop]]
         [[hooks.Stop.hooks]]
         type = "command"
@@ -41,6 +46,11 @@ final class CodexHookIntegrationManager: ObservableObject {
         [[hooks.PreToolUse.hooks]]
         type = "command"
         command = '\(approvedHookCommand)'
+
+        [[hooks.Interrupt]]
+        [[hooks.Interrupt.hooks]]
+        type = "command"
+        command = '\(interruptedHookCommand)'
 
         [[hooks.PostToolUse]]
         [[hooks.PostToolUse.hooks]]
@@ -94,6 +104,12 @@ final class CodexHookIntegrationManager: ObservableObject {
 
         config = appendHookBlockIfNeeded(
             to: config,
+            eventName: "UserPromptSubmit",
+            command: startedHookCommand
+        )
+
+        config = appendHookBlockIfNeeded(
+            to: config,
             eventName: "Stop",
             command: completedHookCommand
         )
@@ -114,6 +130,12 @@ final class CodexHookIntegrationManager: ObservableObject {
             to: config,
             eventName: "PostToolUse",
             command: approvedHookCommand
+        )
+
+        config = appendHookBlockIfNeeded(
+            to: config,
+            eventName: "Interrupt",
+            command: interruptedHookCommand
         )
 
         try config.write(to: codexConfigURL, atomically: true, encoding: .utf8)
@@ -263,14 +285,24 @@ command = '\(command)'
         }
 
         return config.contains("hooks = true") &&
+            containsHookCommand(config, eventName: "UserPromptSubmit", command: startedHookCommand) &&
             config.contains(completedHookCommand) &&
             containsHookCommand(config, eventName: "PermissionRequest", command: approvalHookCommand) &&
             containsHookCommand(config, eventName: "PreToolUse", command: approvedHookCommand) &&
-            containsHookCommand(config, eventName: "PostToolUse", command: approvedHookCommand)
+            containsHookCommand(config, eventName: "PostToolUse", command: approvedHookCommand) &&
+            containsHookCommand(config, eventName: "Interrupt", command: interruptedHookCommand)
     }
 
     private var completedHookCommand: String {
         "\"\(hookScriptURL.path)\" completed"
+    }
+
+    private var startedHookCommand: String {
+        "\"\(hookScriptURL.path)\" started"
+    }
+
+    private var interruptedHookCommand: String {
+        "\"\(hookScriptURL.path)\" interrupted"
     }
 
     private var approvalHookCommand: String {
@@ -285,42 +317,25 @@ command = '\(command)'
         """
 #!/bin/sh
 set -eu
+umask 077
 
 event_type="${1:-completed}"
 events_dir="$HOME/Library/Application Support/Notchly"
 events_file="$events_dir/agent-events.jsonl"
 
 mkdir -p "$events_dir"
-
-case "$event_type" in
-  completed|stop)
-    type="completed"
-    title="Task completed"
-    message="Codex finished"
-    ;;
-  failed)
-    type="failed"
-    title="Task failed"
-    message="Codex failed"
-    ;;
-  approval|access_request|notification|permission_request)
-    type="access_request"
-    title="Need approval"
-    message="Codex is awaiting approval"
-    ;;
-  approved|clear|pre_tool_use|pretooluse|post_tool_use|posttooluse)
-    type="clear"
-    title=""
-    message=""
-    ;;
-  *)
-    type="completed"
-    title="Task completed"
-    message="Codex finished"
-    ;;
-esac
-
-printf '{"source":"codex","type":"%s","title":"%s","message":"%s","ttl":3}\\n' "$type" "$title" "$message" >> "$events_file"
+/usr/bin/python3 -c '
+import json, sys, time
+try:
+    hook = json.load(sys.stdin)
+except (ValueError, TypeError):
+    hook = {}
+kind = {"started": "started", "approved": "progress", "approval": "access_request", "completed": "completed", "interrupted": "cancelled"}.get(sys.argv[1], "progress")
+event = {"source": "codex", "type": kind, "session_id": hook.get("session_id"), "turn_id": hook.get("turn_id"), "timestamp": time.time(), "ttl": 3}
+with open(sys.argv[2], "a", encoding="utf-8") as output:
+    output.write(json.dumps(event, separators=(",", ":")) + "\\n")
+' "$event_type" "$events_file"
+case "$event_type" in completed|interrupted) printf '{}\\n' ;; esac
 """
     }
 

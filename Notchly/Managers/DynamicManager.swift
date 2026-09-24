@@ -53,7 +53,7 @@ final class DynamicManager: ObservableObject {
             .store(in: &cancellables)
 
         settingsManager.$showBattery
-            .combineLatest(settingsManager.$showMusic)
+            .combineLatest(settingsManager.$showMusic, settingsManager.$enableCodexUsageSync)
             .map { _ in () }
             .sink { [weak self] in self?.updateCurrentModule() }
             .store(in: &cancellables)
@@ -61,6 +61,11 @@ final class DynamicManager: ObservableObject {
         agentEventManager.$currentEvent
             .map { _ in () }
             .sink { [weak self] in self?.updateCurrentModule() }
+            .store(in: &cancellables)
+
+        agentEventManager.$isCodexRunning
+            .combineLatest(agentEventManager.$isCodexForeground)
+            .sink { [weak self] _, _ in self?.updateCurrentModule() }
             .store(in: &cancellables)
     }
 
@@ -71,10 +76,10 @@ final class DynamicManager: ObservableObject {
             newModule = .agent
         } else if settingsManager.showMusic && musicManager.hasNowPlayingContent {
             newModule = .music
+        } else if agentEventManager.showsBackgroundCodexActivity {
+            newModule = .usage
         } else if settingsManager.showMusic && musicManager.isResolvingNowPlaying {
             newModule = .none
-        } else if settingsManager.showBattery {
-            newModule = .battery
         } else {
             newModule = .none
         }

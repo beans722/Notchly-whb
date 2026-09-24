@@ -14,7 +14,6 @@ import IOKit
 import IOKit.graphics
 import notify
 import ObjectiveC.runtime
-import Sparkle
 
 @_silgen_name("CGDisplayIOServicePort")
 private func CGDisplayIOServicePort(_ display: CGDirectDisplayID) -> io_service_t
@@ -24,29 +23,22 @@ private typealias DisplayServicesGetBrightnessFunction =
 
 @MainActor
 final class AppEnvironment {
-    private let updaterUserDriverDelegate = SparkleUserDriverDelegate()
-
     let musicManager = MusicManager()
     let settingsManager = SettingsManager()
+    lazy var codexUsageManager = CodexUsageManager(settingsManager: settingsManager)
+    lazy var appleMusicLyricsManager = AppleMusicLyricsManager(
+        musicManager: musicManager,
+        settingsManager: settingsManager
+    )
     let focusManager = FocusManager()
     let brightnessManager = BrightnessManager()
     let networkStatusManager = NetworkStatusManager()
     lazy var agentEventManager = AgentEventManager(settingsManager: settingsManager)
     let codexHookIntegrationManager = CodexHookIntegrationManager()
-    let claudeHookIntegrationManager = ClaudeHookIntegrationManager()
-    let cursorHookIntegrationManager = CursorHookIntegrationManager()
     let lockScreenOverlayModel = LockScreenOverlayModel()
     let lockScreenWallpaperManager = LockScreenWallpaperManager()
     let lockScreenIdentityManager = LockScreenIdentityManager()
-    let whatsNewWindow = WhatsNewWindow()
-
-    lazy var updaterController = SPUStandardUpdaterController(
-        startingUpdater: false,
-        updaterDelegate: nil,
-        userDriverDelegate: updaterUserDriverDelegate
-    )
-
-    lazy var batteryManager = BatteryManager(musicManager: musicManager)
+    lazy var batteryManager = BatteryManager()
 
     lazy var dynamicManager = DynamicManager(
         batteryManager: batteryManager,
@@ -58,33 +50,8 @@ final class AppEnvironment {
     lazy var settingsWindow = SettingsWindow(
         settingsManager: settingsManager,
         codexHookIntegrationManager: codexHookIntegrationManager,
-        claudeHookIntegrationManager: claudeHookIntegrationManager,
-        cursorHookIntegrationManager: cursorHookIntegrationManager,
-        lockScreenIdentityManager: lockScreenIdentityManager
+        codexUsageManager: codexUsageManager
     )
-}
-
-private final class SparkleUserDriverDelegate: NSObject, SPUStandardUserDriverDelegate {
-    var supportsGentleScheduledUpdateReminders: Bool {
-        true
-    }
-
-    func standardUserDriverShouldHandleShowingScheduledUpdate(
-        _ update: SUAppcastItem,
-        andInImmediateFocus immediateFocus: Bool
-    ) -> Bool {
-        true
-    }
-
-    func standardUserDriverWillHandleShowingUpdate(
-        _ handleShowingUpdate: Bool,
-        forUpdate update: SUAppcastItem,
-        state: SPUUserUpdateState
-    ) {
-        guard handleShowingUpdate, !state.userInitiated else { return }
-
-        NSApp.activate(ignoringOtherApps: true)
-    }
 }
 
 // MARK: - Brightness Manager

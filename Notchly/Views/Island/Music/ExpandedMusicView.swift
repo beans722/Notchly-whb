@@ -14,6 +14,10 @@ struct ExpandedMusicView: View {
     let title: String
     let artist: String
     let sourceName: String
+    let lyricLine: String
+    let fiveHourUsage: CodexUsageWindow
+    let weeklyUsage: CodexUsageWindow
+    let showsUsage: Bool
     let isPlaying: Bool
     let isShuffleEnabled: Bool
     let isShuffleControlAvailable: Bool
@@ -100,7 +104,7 @@ struct ExpandedMusicView: View {
                             .foregroundStyle(.white)
                             .lineLimit(1)
 
-                        Text(artist.isEmpty ? "Spotify" : artist)
+                        Text(artist.isEmpty ? "Apple Music" : artist)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.7))
                             .lineLimit(1)
@@ -108,7 +112,7 @@ struct ExpandedMusicView: View {
 
                     Spacer()
 
-                    Text(sourceName.isEmpty ? "Spotify" : sourceName)
+                    Text(sourceName.isEmpty ? "Apple Music" : sourceName)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }
@@ -120,6 +124,21 @@ struct ExpandedMusicView: View {
                 hoverBackgroundOpacity: 0.06,
                 cornerRadius: 13
             ))
+
+            if !lyricLine.isEmpty {
+                Text(lyricLine)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if showsUsage {
+                HStack(spacing: 8) {
+                    UsageBadge(label: "5h", usage: fiveHourUsage)
+                    UsageBadge(label: "Week", usage: weeklyUsage)
+                }
+            }
 
             VStack(spacing: 6) {
                 if isLivestream {
@@ -233,6 +252,22 @@ struct ExpandedMusicView: View {
         .padding(.bottom, 22)
         .frame(width: size.width, height: size.height, alignment: .top)
         .foregroundStyle(.white)
+    }
+}
+
+private struct UsageBadge: View {
+    let label: String
+    let usage: CodexUsageWindow
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(label).foregroundStyle(.white.opacity(0.55))
+            Text(usage.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .monospacedDigit()
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(.white.opacity(0.09))
+        .clipShape(Capsule())
     }
 }
 

@@ -13,8 +13,6 @@ extension ContentView {
     private var nonAgentFallbackView: some View {
         if settingsManager.showMusic && musicManager.hasNowPlayingContent {
             musicContainer
-        } else if settingsManager.showBattery {
-            islandContainer
         } else {
             emptyBar
         }
@@ -78,6 +76,8 @@ extension ContentView {
                     }
                 case .music:
                     musicContainer
+                case .usage:
+                    usageContainer
                 case .none:
                     emptyBar
                 }
@@ -176,7 +176,7 @@ extension ContentView {
             return true
         case .agent:
             return agentEventManager.currentEvent == nil
-        case .battery, .music:
+        case .battery, .music, .usage:
             return false
         }
     }
@@ -192,7 +192,7 @@ extension ContentView {
         switch dynamicManager.currentModule {
         case .none, .agent:
             return true
-        case .battery, .music:
+        case .battery, .music, .usage:
             return false
         }
     }

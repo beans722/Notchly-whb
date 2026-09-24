@@ -12,22 +12,16 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let settingsManager: SettingsManager
     private let codexHookIntegrationManager: CodexHookIntegrationManager
-    private let claudeHookIntegrationManager: ClaudeHookIntegrationManager
-    private let cursorHookIntegrationManager: CursorHookIntegrationManager
-    private let lockScreenIdentityManager: LockScreenIdentityManager
+    private let codexUsageManager: CodexUsageManager
 
     init(
         settingsManager: SettingsManager,
         codexHookIntegrationManager: CodexHookIntegrationManager,
-        claudeHookIntegrationManager: ClaudeHookIntegrationManager,
-        cursorHookIntegrationManager: CursorHookIntegrationManager,
-        lockScreenIdentityManager: LockScreenIdentityManager
+        codexUsageManager: CodexUsageManager
     ) {
         self.settingsManager = settingsManager
         self.codexHookIntegrationManager = codexHookIntegrationManager
-        self.claudeHookIntegrationManager = claudeHookIntegrationManager
-        self.cursorHookIntegrationManager = cursorHookIntegrationManager
-        self.lockScreenIdentityManager = lockScreenIdentityManager
+        self.codexUsageManager = codexUsageManager
         super.init()
     }
 
@@ -45,9 +39,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let rootView = SettingsView(
             settingsManager: settingsManager,
             codexHookIntegrationManager: codexHookIntegrationManager,
-            claudeHookIntegrationManager: claudeHookIntegrationManager,
-            cursorHookIntegrationManager: cursorHookIntegrationManager,
-            lockScreenIdentityManager: lockScreenIdentityManager
+            codexUsageManager: codexUsageManager
         )
             .ignoresSafeArea(.container, edges: .top)
 

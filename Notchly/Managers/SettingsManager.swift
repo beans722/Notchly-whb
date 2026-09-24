@@ -68,6 +68,8 @@ final class SettingsManager: ObservableObject {
         static let musicPreviewDuration = 2.0
         static let enableSpotifyAppleScriptControl = false
         static let enableAppleMusicAppleScriptControl = false
+        static let showAppleMusicLyrics = false
+        static let enableCodexUsageSync = false
         static let launchAtLogin = false
         static let enableLockSound = true
         static let hideNotchWhenFullscreen = false
@@ -118,6 +120,14 @@ final class SettingsManager: ObservableObject {
 
     @Published var enableAppleMusicAppleScriptControl: Bool {
         didSet { UserDefaults.standard.set(enableAppleMusicAppleScriptControl, forKey: "enableAppleMusicAppleScriptControl") }
+    }
+
+    @Published var showAppleMusicLyrics: Bool {
+        didSet { UserDefaults.standard.set(showAppleMusicLyrics, forKey: "showAppleMusicLyrics") }
+    }
+
+    @Published var enableCodexUsageSync: Bool {
+        didSet { UserDefaults.standard.set(enableCodexUsageSync, forKey: "enableCodexUsageSync") }
     }
 
     @Published var launchAtLogin: Bool {
@@ -232,6 +242,8 @@ final class SettingsManager: ObservableObject {
         self.musicPreviewDuration = UserDefaults.standard.object(forKey: "musicPreviewDuration") as? Double ?? Defaults.musicPreviewDuration
         self.enableSpotifyAppleScriptControl = UserDefaults.standard.object(forKey: "enableSpotifyAppleScriptControl") as? Bool ?? Defaults.enableSpotifyAppleScriptControl
         self.enableAppleMusicAppleScriptControl = UserDefaults.standard.object(forKey: "enableAppleMusicAppleScriptControl") as? Bool ?? Defaults.enableAppleMusicAppleScriptControl
+        self.showAppleMusicLyrics = UserDefaults.standard.object(forKey: "showAppleMusicLyrics") as? Bool ?? Defaults.showAppleMusicLyrics
+        self.enableCodexUsageSync = UserDefaults.standard.object(forKey: "enableCodexUsageSync") as? Bool ?? Defaults.enableCodexUsageSync
 
         let savedLaunchAtLogin = UserDefaults.standard.object(forKey: "launchAtLogin") as? Bool
         let systemLaunchAtLogin = SMAppService.mainApp.status == .enabled
@@ -301,9 +313,11 @@ final class SettingsManager: ObservableObject {
         musicPreviewDuration = Defaults.musicPreviewDuration
         enableSpotifyAppleScriptControl = Defaults.enableSpotifyAppleScriptControl
         enableAppleMusicAppleScriptControl = Defaults.enableAppleMusicAppleScriptControl
+        showAppleMusicLyrics = Defaults.showAppleMusicLyrics
     }
 
     func resetCodexSettings() {
+        enableCodexUsageSync = Defaults.enableCodexUsageSync
         enableCodexApprovalAlertSound = Defaults.enableCodexApprovalAlertSound
         enableCodexCompletedAlertSound = Defaults.enableCodexCompletedAlertSound
         codexCompletedAlertDuration = Defaults.codexCompletedAlertDuration
