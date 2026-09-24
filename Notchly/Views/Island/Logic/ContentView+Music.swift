@@ -16,6 +16,14 @@ extension ContentView {
         let hasPendingAgentEvent =
             agentEvent != nil &&
             (showsAgentOverMusic || isAgentMusicTransitionActive)
+        let showsCompactMediaControls =
+            isHovered &&
+            status == .closed &&
+            musicManager.hasNowPlayingContent &&
+            !agentEventManager.showsBackgroundCodexActivity &&
+            !hasPendingAgentEvent &&
+            !hidesMusicContentDuringAgentReturn
+        let compactTopRowSize = CGSize(width: layout.closedSize.width, height: closedHeight)
         let showsAgentActivity =
             hasPendingAgentEvent &&
             isAgentMusicTransitionActive &&
@@ -57,30 +65,49 @@ extension ContentView {
                 (status == .focusCollapse && focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) ||
                 (status == .brightnessCollapse && brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) ||
                 (status == .volumeCollapse && volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn)) {
-                Group {
-                    if agentEventManager.showsBackgroundCodexActivity {
-                        CodexBackgroundActivityStatusView(
-                            size: layout.closedSize,
-                            notchWidth: min(configuredIdleIslandWidth, layout.closedSize.width),
-                            fiveHourText: codexUsageManager.fiveHour.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
-                            weeklyText: codexUsageManager.weekly.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
-                            showsUsage: settingsManager.enableCodexUsageSync
-                        )
-                    } else {
-                        CompactMusicView(
-                            artwork: musicManager.artworkImage,
-                            waveformColor: musicManager.waveformColor,
-                            isPlaying: isWaveformActive,
-                            size: layout.closedSize,
-                            hoverOffsetY: hoverOffsetY,
-                            skipIndicator: skipIndicator,
-                            fiveHourUsage: codexUsageManager.fiveHour,
-                            weeklyUsage: codexUsageManager.weekly,
-                            showsUsage: settingsManager.enableCodexUsageSync
+                VStack(spacing: 0) {
+                    Group {
+                        if agentEventManager.showsBackgroundCodexActivity {
+                            CodexBackgroundActivityStatusView(
+                                size: compactTopRowSize,
+                                notchWidth: min(configuredIdleIslandWidth, compactTopRowSize.width),
+                                fiveHourText: codexUsageManager.fiveHour.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
+                                weeklyText: codexUsageManager.weekly.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
+                                showsUsage: settingsManager.enableCodexUsageSync
+                            )
+                        } else {
+                            CompactMusicView(
+                                artwork: musicManager.artworkImage,
+                                waveformColor: musicManager.waveformColor,
+                                isPlaying: isWaveformActive,
+                                size: compactTopRowSize,
+                                hoverOffsetY: hoverOffsetY,
+                                skipIndicator: skipIndicator,
+                                fiveHourUsage: codexUsageManager.fiveHour,
+                                weeklyUsage: codexUsageManager.weekly,
+                                showsUsage: settingsManager.enableCodexUsageSync,
+                                showsControls: showsCompactMediaControls,
+                                isLivestream: isLivestream,
+                                onPrevious: { musicManager.previousTrack() },
+                                onTogglePlay: {
+                                    animatePlayPauseButton()
+                                    musicManager.togglePlay()
+                                },
+                                onNext: { musicManager.nextTrack() },
+                                onOpenPlayer: { openCompactMusicPlayer() }
+                            )
+                        }
+                    }
+                    .frame(width: compactTopRowSize.width, height: compactTopRowSize.height)
+
+                    if showsCompactLyrics {
+                        CompactMusicLyricsRow(
+                            lyricLine: appleMusicLyricsManager.currentLine,
+                            isAccessibilityAvailable: appleMusicLyricsManager.isAccessibilityAvailable
                         )
                     }
                 }
-                .allowsHitTesting(false)
+                .frame(width: layout.closedSize.width, height: layout.closedSize.height, alignment: .top)
                 .transition(.opacity)
                 .zIndex(1)
             }
@@ -241,17 +268,11 @@ extension ContentView {
         .contentShape(RoundedRectangle(cornerRadius: layout.cornerRadius))
         .overlay(
             ZStack {
-                if !hasPendingAgentEvent && (status == .closed || status == .musicPreview) {
+                if !hasPendingAgentEvent &&
+                    (status == .closed || status == .musicPreview) &&
+                    !showsCompactMediaControls {
                     IslandClickCatcher {
-                        guard settingsManager.showMusic else { return }
-
-                        autoExpandMusicTask?.cancel()
-
-                        withAnimation(animation) {
-                            status = .opened
-                        }
-
-                        scheduleAutoClose(after: 2.0)
+                        openCompactMusicPlayer()
                     }
                 }
 
@@ -268,6 +289,16 @@ extension ContentView {
                 }
             }
         )
+    }
+
+    func openCompactMusicPlayer() {
+        guard settingsManager.showMusic else { return }
+
+        autoExpandMusicTask?.cancel()
+        withAnimation(animation) {
+            status = .opened
+        }
+        scheduleAutoClose(after: 2.0)
     }
 
     func handleMusicScroll(deltaX: CGFloat, deltaY: CGFloat) {
@@ -356,6 +387,7 @@ extension ContentView {
     func handleMusicAutoExpand(isPlaying: Bool) {
         guard lockScreenOverlayModel.state == .music else { return }
         guard !isAgentAlertBlockingOtherEvents else { return }
+        guard !(status == .closed && isHovered) else { return }
         guard dynamicManager.currentModule == .music || musicManager.hasNowPlayingContent else { return }
         guard isPlaying else { return }
         guard settingsManager.showMusic else { return }

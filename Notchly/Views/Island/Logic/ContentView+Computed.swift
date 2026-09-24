@@ -24,6 +24,7 @@ extension ContentView {
             isMusicModule: usesMusicLayout,
             showChargingPop: showChargingPop,
             isMusicVolumeControlExpanded: showMusicVolumeControl,
+            showsCompactLyrics: showsCompactLyrics,
             closedHeight: closedHeight,
             islandWidth: effectiveIslandWidth,
             allowsCompactBaseWidth: musicStartUsesIdleWidth,
@@ -138,6 +139,16 @@ extension ContentView {
 
     var closedHeight: CGFloat {
         resolvedClosedHeight
+    }
+
+    var showsCompactLyrics: Bool {
+        status == .closed &&
+            settingsManager.showMusic &&
+            settingsManager.showAppleMusicLyrics &&
+            musicManager.currentSource == .appleMusic &&
+            musicManager.isPlaying &&
+            activeAgentEvent == nil &&
+            !hidesMusicContentDuringAgentReturn
     }
 
     var configuredBaseIslandWidth: CGFloat {

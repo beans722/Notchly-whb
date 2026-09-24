@@ -33,8 +33,8 @@
 
 ## Highlights
 
-- Apple Music playback controls and the currently playing track.
-- Optional lyric reading from the visible Music app interface using macOS Accessibility; lyrics stay on this Mac.
+- Hover the compact island for previous, play/pause, and next controls.
+- With Apple Music Lyrics enabled, one lyric line stays anchored below the compact island while Music plays. Lyrics are read from the visible Music app interface using macOS Accessibility and stay on this Mac.
 - Codex background-task status shown beside the physical notch only while Codex is not frontmost.
 - Optional five-hour and weekly usage windows, refreshed at most every five minutes.
 - Local Codex activity hooks store status and IDs, never prompt text.

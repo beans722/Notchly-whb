@@ -12,6 +12,7 @@ struct IslandLayout {
     let isMusicModule: Bool
     let showChargingPop: Bool
     let isMusicVolumeControlExpanded: Bool
+    let showsCompactLyrics: Bool
     let closedHeight: CGFloat
     let islandWidth: CGFloat
     let allowsCompactBaseWidth: Bool
@@ -19,12 +20,17 @@ struct IslandLayout {
 
     let spacing: CGFloat = 10
 
+    static let compactLyricsRowHeight: CGFloat = 24
+
     var baseWidth: CGFloat {
         min(max(islandWidth, allowsCompactBaseWidth ? 160 : 280), 360)
     }
 
     var closedSize: CGSize {
-        CGSize(width: baseWidth, height: closedHeight)
+        CGSize(
+            width: baseWidth,
+            height: closedHeight + (showsCompactLyrics ? Self.compactLyricsRowHeight : 0)
+        )
     }
 
     var idleWidth: CGFloat {
