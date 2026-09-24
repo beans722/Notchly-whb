@@ -80,7 +80,38 @@ verified the downloaded file; otherwise, do not override Gatekeeper. See
 [Apple's safety guidance](https://support.apple.com/en-by/102445). The app is
 arm64 only. Quota sync is off by default and requires explicit opt-in.
 
+To check the download, put the DMG and checksum file in the same folder and
+run `shasum -a 256 -c Notchly-V1-arm64.dmg.sha256`. After copying Notchly to
+Applications, if macOS blocks first launch, Control-click the app, choose
+**Open**, then confirm **Open** in the warning. This makes a per-app exception;
+do not disable Gatekeeper globally.
+
 ## Build From Source
+
+### Make an app and DMG without a paid developer account
+
+Install Xcode, then run:
+
+```sh
+git clone https://github.com/beans722/Notchly-whb.git
+cd Notchly-whb
+bash scripts/package-test-dmg.sh
+```
+
+The script resolves the pinned Swift packages, builds a Release `.app` for the
+current Mac architecture (`arm64` or `x86_64`), verifies its signature and
+minimum macOS version, and creates a drag-to-Applications DMG plus a SHA-256
+file under `build/dist/`. It uses an ad-hoc signature, so no paid Apple
+Developer account or personal Team ID is needed. The resulting app is not
+notarized; macOS may require a one-time manual approval in System Settings →
+Privacy & Security. Only approve a build you compiled yourself or verified.
+
+To build for an Intel Mac from Apple silicon, run
+`NOTCHLY_ARCH=x86_64 bash scripts/package-test-dmg.sh`. To build for Apple
+silicon from an Intel Mac, use `NOTCHLY_ARCH=arm64`. The machine must have
+Xcode and internet access to resolve the pinned Swift packages.
+
+### Run directly from Xcode
 
 ```sh
 git clone https://github.com/beans722/Notchly-whb.git
@@ -96,13 +127,6 @@ project. Then build and run with **Product → Run**. On first launch:
 - Install the Codex Live Activity hook from Settings → Codex.
 - Leave Codex Usage Sync off unless you want to send the existing Codex access
   token to the endpoint above.
-
-For command-line builds, supply your own team identifier:
-
-```sh
-xcodebuild -project Notchly.xcodeproj -scheme Notchly -configuration Release \
-  DEVELOPMENT_TEAM=YOUR_TEAM_ID -allowProvisioningUpdates build
-```
 
 ## Dependencies
 
