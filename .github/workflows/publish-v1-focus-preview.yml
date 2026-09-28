@@ -1,0 +1,42 @@
+name: Publish V1 Focus Preview
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-v1-focus-preview.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify both downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          shasum -a 256 -c Notchly-V1-focus-preview-arm64.dmg.sha256
+          shasum -a 256 -c Notchly-V1-focus-preview-x86_64.dmg.sha256
+          for arch in arm64 x86_64; do
+            hdiutil verify "Notchly-V1-focus-preview-${arch}.dmg"
+          done
+
+      - name: Create the preview release with both DMGs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v1.0.0-focus-preview \
+            Notchly-V1-focus-preview-arm64.dmg \
+            Notchly-V1-focus-preview-arm64.dmg.sha256 \
+            Notchly-V1-focus-preview-x86_64.dmg \
+            Notchly-V1-focus-preview-x86_64.dmg.sha256 \
+            --target "$GITHUB_SHA" \
+            --title "Notchly V1 Focus Preview" \
+            --notes-file docs/V1-FOCUS-PREVIEW-RELEASE.md \
+            --prerelease
