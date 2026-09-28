@@ -97,7 +97,7 @@ Enable it in **Settings → Codex**:
 
 ## V1 Focus Preview Download
 
-Choose the DMG for your Mac: [Apple silicon](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-focus-preview-arm64.dmg) or [Intel](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-focus-preview-x86_64.dmg). Matching SHA-256 files: [Apple silicon](Notchly-V1-focus-preview-arm64.dmg.sha256) · [Intel](Notchly-V1-focus-preview-x86_64.dmg.sha256). Open the DMG and drag Notchly to Applications.
+Download from the [V1 Focus Preview Release](https://github.com/beans722/Notchly-whb/releases/tag/v1.0.0-focus-preview): choose the Apple silicon (`arm64`) or Intel (`x86_64`) DMG and its matching `.sha256` file. Open the DMG and drag Notchly to Applications. See the [complete installation and safety notes](docs/V1-FOCUS-PREVIEW-RELEASE.md).
 
 This test build is ad-hoc signed and **not notarized by Apple**. macOS may warn
 or block it on first launch. Only proceed if you trust this repository and have
@@ -109,9 +109,10 @@ signing and notarization. Quota sync is off by default and requires explicit opt
 To check the download, put the DMG and checksum file in the same folder and
 run `shasum -a 256 -c Notchly-V1-focus-preview-arm64.dmg.sha256` (or use the
 matching Intel filename). After copying Notchly to
-Applications, if macOS blocks first launch, Control-click the app, choose
-**Open**, then confirm **Open** in the warning. This makes a per-app exception;
-do not disable Gatekeeper globally.
+Applications, if macOS blocks first launch, use **Open Anyway** in System
+Settings → Privacy & Security. This makes a per-app exception; do not disable
+Gatekeeper globally. The release notes include a targeted `sudo xattr` command
+only as a last resort for a verified copy.
 
 ## Build From Source
 
