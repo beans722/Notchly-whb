@@ -32,11 +32,34 @@ extension ContentView {
         )
     }
 
+    var focusPanelWidth: CGFloat {
+        let physicalNotchWidth = IslandWidthResolver.notchWidth(for: currentScreen) ?? 0
+        let surfaceWidth: CGFloat
+        if isMusicPlaybackActive {
+            surfaceWidth = min(max(layout.islandSize.width, physicalNotchWidth + 196), 420)
+        } else if agentEventManager.showsBackgroundCodexActivity {
+            surfaceWidth = min(max(layout.closedSize.width, physicalNotchWidth + 144), 360)
+        } else {
+            surfaceWidth = min(max(layout.islandSize.width, 328), 420)
+        }
+        return surfaceWidth + layout.cornerRadius * 0.75
+    }
+
     var activeModuleView: some View {
         Group {
             let hasActiveAgentEvent = activeAgentEvent != nil
 
-            if isAgentMusicTransitionActive {
+            if let notice = codexNotice,
+               notice.kind == .accessRequest,
+               (!isMusicPlaybackActive || showsCodexApprovalOverlay) {
+                if isAgentMusicTransitionActive { musicContainer } else { agentContainer }
+            } else if isMusicPlaybackActive {
+                musicContainer
+            } else if codexNotice != nil {
+                if isAgentMusicTransitionActive { musicContainer } else { agentContainer }
+            } else if agentEventManager.showsBackgroundCodexActivity {
+                usageContainer
+            } else if isAgentMusicTransitionActive {
                 musicContainer
             } else if isStandaloneAgentPresentationActive {
                 agentContainer
@@ -61,6 +84,8 @@ extension ContentView {
                 musicManager.hasNowPlayingContent &&
                 (musicStartUsesIdleWidth || !stagedMusicAutoOpenKey.isEmpty) {
                 musicContainer
+            } else if focusSessionManager.phase != .idle {
+                focusStatusContainer
             } else {
                 switch dynamicManager.currentModule {
                 case .agent:
@@ -87,10 +112,35 @@ extension ContentView {
     }
 
     var layoutStatus: IslandStatus {
-        return status
+        if let notice = codexNotice,
+           !isMusicPlaybackActive || (notice.kind == .accessRequest && showsCodexApprovalOverlay) {
+            return status
+        }
+        if agentEventManager.showsBackgroundCodexActivity && !isMusicPlaybackActive {
+            return .closed
+        }
+        return musicDisplayStatus
+    }
+
+    var isMusicPlaybackActive: Bool {
+        settingsManager.showMusic &&
+            musicManager.hasNowPlayingContent &&
+            musicManager.isPlaying
+    }
+
+    var musicDisplayStatus: IslandStatus {
+        guard isMusicPlaybackActive,
+              status == .agentPreview || status == .agentCollapse else {
+            return status
+        }
+
+        return .closed
     }
 
     var usesMusicLayout: Bool {
+        if agentEventManager.showsBackgroundCodexActivity && !isMusicPlaybackActive {
+            return false
+        }
         if dynamicManager.currentModule == .music || isAgentMusicTransitionActive {
             return true
         }
@@ -107,9 +157,7 @@ extension ContentView {
     }
 
     var canShowAgentOverMusic: Bool {
-        guard settingsManager.showMusic else { return false }
-        guard musicManager.isPlaying else { return false }
-        guard musicManager.hasNowPlayingContent else { return false }
+        guard !isMusicPlaybackActive else { return false }
 
         switch status {
         case .closed, .opened, .musicPreview:
@@ -127,6 +175,14 @@ extension ContentView {
         displayedAgentEvent ?? agentEventManager.currentEvent
     }
 
+    var codexNotice: AgentEvent? {
+        guard let event = activeAgentEvent, event.source.lowercased() == "codex" else { return nil }
+        switch event.kind {
+        case .accessRequest, .completed: return event
+        default: return nil
+        }
+    }
+
     var isStandaloneAgentPresentationActive: Bool {
         guard !isAgentMusicTransitionActive else { return false }
         guard activeAgentEvent != nil else { return false }
@@ -142,13 +198,13 @@ extension ContentView {
     }
 
     var showsCompactLyrics: Bool {
-        status == .closed &&
+        musicDisplayStatus == .closed &&
             settingsManager.showMusic &&
             settingsManager.showAppleMusicLyrics &&
             musicManager.currentSource == .appleMusic &&
             musicManager.isPlaying &&
-            activeAgentEvent == nil &&
-            !hidesMusicContentDuringAgentReturn
+            (focusSessionManager.phase == .idle || focusSessionManager.showsLyricsDuringFocus) &&
+            (!hidesMusicContentDuringAgentReturn || isMusicPlaybackActive)
     }
 
     var configuredBaseIslandWidth: CGFloat {
@@ -163,6 +219,10 @@ extension ContentView {
     }
 
     var effectiveIslandWidth: CGFloat {
+        if agentEventManager.showsBackgroundCodexActivity && !isMusicPlaybackActive {
+            let physicalNotchWidth = IslandWidthResolver.notchWidth(for: currentScreen) ?? 0
+            return min(max(configuredBaseIslandWidth, physicalNotchWidth + 144), 360)
+        }
         guard musicStartUsesIdleWidth,
               status == .closed else {
             return CGFloat(settingsManager.islandWidth)
@@ -173,6 +233,7 @@ extension ContentView {
 
     var usesIdleNotchSize: Bool {
         guard status == .closed else { return false }
+        if agentEventManager.showsBackgroundCodexActivity && !isMusicPlaybackActive { return false }
         guard !idleNotchSizeSuppressed else { return false }
         if activeAgentEvent != nil {
             return canUseCompactAgentClosedSize
@@ -194,6 +255,7 @@ extension ContentView {
 
     var canUseCompactAgentClosedSize: Bool {
         guard status == .closed else { return false }
+        if agentEventManager.showsBackgroundCodexActivity && !isMusicPlaybackActive { return false }
         guard !idleNotchSizeSuppressed else { return false }
         guard !showChargingPop else { return false }
         guard !musicEndKeepsFullWidth else { return false }

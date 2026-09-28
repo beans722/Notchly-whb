@@ -72,12 +72,16 @@ final class DynamicManager: ObservableObject {
     func updateCurrentModule() {
         let newModule: IslandModule
 
-        if agentEventManager.currentEvent != nil {
-            newModule = .agent
-        } else if settingsManager.showMusic && musicManager.hasNowPlayingContent {
+        if settingsManager.showMusic &&
+            musicManager.hasNowPlayingContent &&
+            musicManager.isPlaying {
             newModule = .music
         } else if agentEventManager.showsBackgroundCodexActivity {
             newModule = .usage
+        } else if agentEventManager.currentEvent != nil {
+            newModule = .agent
+        } else if settingsManager.showMusic && musicManager.hasNowPlayingContent {
+            newModule = .music
         } else if settingsManager.showMusic && musicManager.isResolvingNowPlaying {
             newModule = .none
         } else {

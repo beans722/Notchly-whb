@@ -623,6 +623,7 @@ final class SkyLightOverlayController {
             appleMusicLyricsManager: environment.appleMusicLyricsManager,
             codexUsageManager: environment.codexUsageManager,
             focusManager: environment.focusManager,
+            focusSessionManager: environment.focusSessionManager,
             brightnessManager: environment.brightnessManager,
             networkStatusManager: environment.networkStatusManager,
             agentEventManager: environment.agentEventManager,
@@ -657,7 +658,7 @@ final class SkyLightOverlayController {
     }
 
     private var islandWindowSize: CGSize {
-        CGSize(width: 456, height: 280)
+        CGSize(width: 456, height: 340)
     }
 
     private func lockScreenPlayerYPosition(for screen: NSScreen) -> CGFloat {
@@ -767,7 +768,7 @@ final class SkyLightOverlayController {
 
     private func configureOverlayWindow(_ window: NSWindow?) {
         guard let window else { return }
-        window.acceptsMouseMovedEvents = false
+        window.acceptsMouseMovedEvents = true
     }
 
     private func targetScreen() -> NSScreen? {

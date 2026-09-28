@@ -30,6 +30,9 @@ extension ContentView {
         agentPresentationStartedAt = nil
         agentPresentationTask?.cancel()
         agentPresentationTask = nil
+        codexApprovalOverlayTask?.cancel()
+        codexApprovalOverlayTask = nil
+        showsCodexApprovalOverlay = false
         showsStandaloneAgentContent = false
         isStandaloneAgentClosing = false
         showsAgentMusicContent = false
@@ -53,6 +56,8 @@ extension ContentView {
     }
 
     func handleDisappear() {
+        focusCompletionNoticeTask?.cancel()
+        focusCompletionNoticeTask = nil
         autoExpandMusicTask?.cancel()
         autoExpandMusicTask = nil
         focusStatusTask?.cancel()
@@ -68,6 +73,8 @@ extension ContentView {
         agentDismissTask = nil
         agentPresentationTask?.cancel()
         agentPresentationTask = nil
+        codexApprovalOverlayTask?.cancel()
+        codexApprovalOverlayTask = nil
         agentMusicHideTask?.cancel()
         agentMusicHideTask = nil
         musicStartWidthTask?.cancel()
@@ -83,6 +90,9 @@ extension ContentView {
             beginLockIslandDismissal()
             return
         }
+
+        focusSessionManager.pause()
+        isFocusPanelExpanded = false
 
         autoExpandMusicTask?.cancel()
         autoExpandMusicTask = nil
@@ -285,6 +295,17 @@ extension ContentView {
     }
 
     func handleAgentEventChange(_ event: AgentEvent?) {
+        codexApprovalOverlayTask?.cancel()
+        codexApprovalOverlayTask = nil
+        showsCodexApprovalOverlay = event?.source.lowercased() == "codex" && event?.kind == .accessRequest
+        if showsCodexApprovalOverlay {
+            codexApprovalOverlayTask = Task {
+                try? await Task.sleep(for: .seconds(4))
+                guard !Task.isCancelled else { return }
+                showsCodexApprovalOverlay = false
+                codexApprovalOverlayTask = nil
+            }
+        }
         if let event {
             agentDismissTask?.cancel()
             agentDismissTask = nil

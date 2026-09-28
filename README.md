@@ -34,10 +34,37 @@
 ## Highlights
 
 - Hover the compact island for previous, play/pause, and next controls.
-- With Apple Music Lyrics enabled, one lyric line stays anchored below the compact island while Music plays. Lyrics are read from the visible Music app interface using macOS Accessibility and stay on this Mac.
+- With Apple Music Lyrics enabled, one lyric line stays anchored below the compact island while Music plays. Time-synced lyrics are read from Music's local cache when available; no lyric text is sent to a server.
 - Codex background-task status shown beside the physical notch only while Codex is not frontmost.
 - Optional five-hour and weekly usage windows, refreshed at most every five minutes.
 - Local Codex activity hooks store status and IDs, never prompt text.
+- A local focus timer and two optional pixel pets live behind the island's hover controls.
+
+## Focus Pet Preview
+
+Hover over the island and open **专注** in the attached island panel. The timer
+defaults to 25 minutes; 15 and 60 minutes are also available. Only a session
+started by the user counts. While a session is active or paused, a small
+segmented ring on the island's right side shows the approximate time remaining, taking priority
+over the compact Codex usage readout or music waveform. Hover for the exact
+remaining time, or turn on **时间常显** to keep it visible. Music controls remain
+available; lyrics are hidden during focus by default, with **专注时歌词** as an
+optional toggle.
+Stopping early credits actual focused time only after 15 minutes. Locking the
+Mac or putting it to sleep pauses the timer; resuming is manual. Reaching the
+target gives a brief island reminder, without starting a break or changing
+music playback.
+
+The jumping bean and little calf are both claimable after 15 accumulated
+minutes in this **tester build**. Claiming does not spend time; the chosen pet
+replaces the compact Codex pulse or music waveform without covering controls
+or lyrics. Focus totals and claimed pets stay in local app
+preferences. There is no focus account, telemetry, or network sync.
+
+Before a public release, build with `NOTCHLY_PUBLIC_RELEASE` as an active Swift
+compilation condition. This switches the bean and calf thresholds to the
+agreed 10 and 100 accumulated hours respectively; the tester policy remains
+the default for local test packages.
 
 ## Codex AI Alerts
 
@@ -68,20 +95,20 @@ Enable it in **Settings → Codex**:
 
 - macOS 14.6 or newer.
 
-## V1 Test Download
+## V1 Focus Preview Download
 
-[Download the Apple silicon DMG](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-arm64.dmg).
-[Verify its SHA-256 checksum](Notchly-V1-arm64.dmg.sha256).
-Drag Notchly into Applications to install it.
+Choose the DMG for your Mac: [Apple silicon](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-focus-preview-arm64.dmg) or [Intel](https://github.com/beans722/Notchly-whb/raw/refs/heads/main/Notchly-V1-focus-preview-x86_64.dmg). Matching SHA-256 files: [Apple silicon](Notchly-V1-focus-preview-arm64.dmg.sha256) · [Intel](Notchly-V1-focus-preview-x86_64.dmg.sha256). Open the DMG and drag Notchly to Applications.
 
 This test build is ad-hoc signed and **not notarized by Apple**. macOS may warn
 or block it on first launch. Only proceed if you trust this repository and have
 verified the downloaded file; otherwise, do not override Gatekeeper. See
-[Apple's safety guidance](https://support.apple.com/en-by/102445). The app is
-arm64 only. Quota sync is off by default and requires explicit opt-in.
+[Apple's safety guidance](https://support.apple.com/en-by/102445). There is no
+safe way to guarantee a warning-free first launch without Apple Developer ID
+signing and notarization. Quota sync is off by default and requires explicit opt-in.
 
 To check the download, put the DMG and checksum file in the same folder and
-run `shasum -a 256 -c Notchly-V1-arm64.dmg.sha256`. After copying Notchly to
+run `shasum -a 256 -c Notchly-V1-focus-preview-arm64.dmg.sha256` (or use the
+matching Intel filename). After copying Notchly to
 Applications, if macOS blocks first launch, Control-click the app, choose
 **Open**, then confirm **Open** in the warning. This makes a per-app exception;
 do not disable Gatekeeper globally.
@@ -129,7 +156,7 @@ In Xcode, select the **Notchly** target → **Signing & Capabilities** and choos
 your own Apple development team. Do not add a personal Team ID to the shared
 project. Then build and run with **Product → Run**. On first launch:
 
-- Grant Accessibility access only if you want local Apple Music lyrics.
+- Local cached Apple Music lyrics do not require Accessibility access.
 - Install the Codex Live Activity hook from Settings → Codex.
 - Leave Codex Usage Sync off unless you want to send the existing Codex access
   token to the endpoint above.

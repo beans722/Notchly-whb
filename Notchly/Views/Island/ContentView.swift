@@ -16,6 +16,7 @@ struct ContentView: View {
     @ObservedObject var appleMusicLyricsManager: AppleMusicLyricsManager
     @ObservedObject var codexUsageManager: CodexUsageManager
     @ObservedObject var focusManager: FocusManager
+    @ObservedObject var focusSessionManager: FocusSessionManager
     @ObservedObject var brightnessManager: BrightnessManager
     @ObservedObject var networkStatusManager: NetworkStatusManager
     @ObservedObject var agentEventManager: AgentEventManager
@@ -26,6 +27,9 @@ struct ContentView: View {
     @State var status: IslandStatus = .closed
     @State var showChargingPop = false
     @State var isHovered = false
+    @State var isFocusPanelExpanded = false
+    @State var showsFocusCompletionNotice = false
+    @State var focusCompletionNoticeTask: Task<Void, Never>?
     @State var hasFinishedInitialAppear = false
     @State var autoExpandMusicTask: Task<Void, Never>?
     @State var focusStatusTask: Task<Void, Never>?
@@ -66,6 +70,8 @@ struct ContentView: View {
     @State var agentPresentationStartedAt: Date?
     @State var agentDismissTask: Task<Void, Never>?
     @State var agentPresentationTask: Task<Void, Never>?
+    @State var codexApprovalOverlayTask: Task<Void, Never>?
+    @State var showsCodexApprovalOverlay = false
     @State var showsStandaloneAgentContent = false
     @State var isStandaloneAgentClosing = false
     @State var showsAgentMusicContent = false
@@ -114,14 +120,28 @@ struct ContentView: View {
                 .allowsHitTesting(false)
                 .zIndex(10)
             } else {
-                activeModuleView
-                    .padding(.top, 0)
-                    .zIndex(10)
-                    .scaleEffect(hoverScale, anchor: .top)
-                    .onHover { hovering in
-                        handleHover(hovering)
+                VStack(spacing: -1) {
+                    activeModuleView
+                        .scaleEffect(hoverScale, anchor: .top)
+                        .animation(.easeInOut(duration: 0.22), value: settingsManager.showBattery)
+
+                    if (isHovered || isFocusPanelExpanded || showsFocusCompletionNotice) &&
+                        layoutStatus == .closed && codexNotice == nil &&
+                        !isAgentMusicTransitionActive {
+                        FocusControlsView(
+                            manager: focusSessionManager,
+                            isExpanded: $isFocusPanelExpanded,
+                            showsCompletionNotice: showsFocusCompletionNotice,
+                            width: focusPanelWidth
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
-                    .animation(.easeInOut(duration: 0.22), value: settingsManager.showBattery)
+                }
+                .zIndex(10)
+                .onHover { hovering in
+                    handleHover(hovering)
+                    if !hovering { isFocusPanelExpanded = false }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -169,6 +189,17 @@ struct ContentView: View {
         }
         .onChange(of: lockScreenOverlayModel.state) { _, state in
             handleLockScreenStateChange(state)
+        }
+        .onChange(of: focusSessionManager.completionEventID) { _, eventID in
+            guard eventID > 0 else { return }
+            focusCompletionNoticeTask?.cancel()
+            showsFocusCompletionNotice = true
+            focusCompletionNoticeTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                guard !Task.isCancelled else { return }
+                showsFocusCompletionNotice = false
+                focusCompletionNoticeTask = nil
+            }
         }
         .onChange(of: status) { _, newValue in
             playPendingNetworkEventIfReady()

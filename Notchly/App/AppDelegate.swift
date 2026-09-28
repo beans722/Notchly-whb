@@ -44,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menuController.install()
         environment.agentEventManager.start()
+        environment.focusSessionManager.startObserving()
         environment.musicManager.start()
         environment.appleMusicLyricsManager.start()
         environment.codexUsageManager.start()
@@ -57,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         environment.appleMusicLyricsManager.stop()
         environment.codexUsageManager.stop()
         environment.agentEventManager.stop()
+        environment.focusSessionManager.stopObserving()
         overlayController.stop()
     }
 

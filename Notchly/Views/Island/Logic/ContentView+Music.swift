@@ -11,20 +11,35 @@ extension ContentView {
     @ViewBuilder
     var musicContainer: some View {
         let isWaveformActive = animationsEnabled && musicManager.isPlaying
-        let clippedWidth = max(0, layout.islandSize.width + layout.cornerRadius * 2)
+        let musicStatus = musicDisplayStatus
+        let physicalNotchWidth = min(
+            IslandWidthResolver.notchWidth(for: currentScreen) ?? 0,
+            layout.closedSize.width
+        )
         let agentEvent = displayedAgentEvent ?? agentEventManager.currentEvent
         let hasPendingAgentEvent =
+            !isMusicPlaybackActive &&
             agentEvent != nil &&
             (showsAgentOverMusic || isAgentMusicTransitionActive)
         let showsCompactMediaControls =
             isHovered &&
-            status == .closed &&
+            musicStatus == .closed &&
             musicManager.hasNowPlayingContent &&
-            !agentEventManager.showsBackgroundCodexActivity &&
+            (!agentEventManager.showsBackgroundCodexActivity || isMusicPlaybackActive) &&
             !hasPendingAgentEvent &&
             !hidesMusicContentDuringAgentReturn
-        let compactTopRowSize = CGSize(width: layout.closedSize.width, height: closedHeight)
+        let minimumControlGutter: CGFloat = 98
+        let controlIslandWidth = showsCompactMediaControls && physicalNotchWidth > 0
+            ? physicalNotchWidth + (minimumControlGutter * 2)
+            : layout.islandSize.width
+        let musicIslandSize = CGSize(
+            width: min(max(layout.islandSize.width, controlIslandWidth), 420),
+            height: layout.islandSize.height
+        )
+        let clippedWidth = max(0, musicIslandSize.width + layout.cornerRadius * 2)
+        let compactTopRowSize = CGSize(width: musicIslandSize.width, height: closedHeight)
         let showsAgentActivity =
+            !isMusicPlaybackActive &&
             hasPendingAgentEvent &&
             isAgentMusicTransitionActive &&
             (status == .agentPreview || isAgentMusicClosing)
@@ -55,38 +70,36 @@ extension ContentView {
                 }
             } else {
                 IslandContainerView(
-                    size: layout.islandSize,
+                    size: musicIslandSize,
                     cornerRadius: layout.cornerRadius,
                     spacing: layout.spacing,
-                    shadowOpacity: status == .opened || status == .popping ? 0.2 : 0
+                    shadowOpacity: musicStatus == .opened || musicStatus == .popping ? 0.2 : 0
                 ) {
-            if !hidesMusicContentDuringAgentReturn && !hasPendingAgentEvent && (status == .closed ||
-                status == .popping ||
-                (status == .focusCollapse && focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) ||
-                (status == .brightnessCollapse && brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) ||
-                (status == .volumeCollapse && volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn)) {
+            if (!hidesMusicContentDuringAgentReturn || isMusicPlaybackActive) && !hasPendingAgentEvent && (musicStatus == .closed ||
+                musicStatus == .popping ||
+                (musicStatus == .focusCollapse && focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) ||
+                (musicStatus == .brightnessCollapse && brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) ||
+                (musicStatus == .volumeCollapse && volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn)) {
                 VStack(spacing: 0) {
                     Group {
-                        if agentEventManager.showsBackgroundCodexActivity {
-                            CodexBackgroundActivityStatusView(
-                                size: compactTopRowSize,
-                                notchWidth: min(configuredIdleIslandWidth, compactTopRowSize.width),
-                                fiveHourText: codexUsageManager.fiveHour.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
-                                weeklyText: codexUsageManager.weekly.visiblePercent.map { "\(Int(($0 * 100).rounded()))%" } ?? "—",
-                                showsUsage: settingsManager.enableCodexUsageSync
-                            )
-                        } else {
-                            CompactMusicView(
+                        CompactMusicView(
                                 artwork: musicManager.artworkImage,
                                 waveformColor: musicManager.waveformColor,
                                 isPlaying: isWaveformActive,
                                 size: compactTopRowSize,
+                                notchWidth: min(
+                                    IslandWidthResolver.notchWidth(for: currentScreen) ?? 0,
+                                    compactTopRowSize.width
+                                ),
                                 hoverOffsetY: hoverOffsetY,
                                 skipIndicator: skipIndicator,
                                 fiveHourUsage: codexUsageManager.fiveHour,
                                 weeklyUsage: codexUsageManager.weekly,
-                                showsUsage: settingsManager.enableCodexUsageSync,
+                                showsUsage: false,
                                 showsControls: showsCompactMediaControls,
+                                pet: focusSessionManager.selectedPet,
+                                focusManager: focusSessionManager,
+                                showsFocusExactTime: isHovered || focusSessionManager.alwaysShowsExactTime,
                                 isLivestream: isLivestream,
                                 onPrevious: { musicManager.previousTrack() },
                                 onTogglePlay: {
@@ -96,23 +109,22 @@ extension ContentView {
                                 onNext: { musicManager.nextTrack() },
                                 onOpenPlayer: { openCompactMusicPlayer() }
                             )
-                        }
                     }
                     .frame(width: compactTopRowSize.width, height: compactTopRowSize.height)
 
                     if showsCompactLyrics {
                         CompactMusicLyricsRow(
                             lyricLine: appleMusicLyricsManager.currentLine,
-                            isAccessibilityAvailable: appleMusicLyricsManager.isAccessibilityAvailable
+                            emptyMessage: appleMusicLyricsManager.lyricStatus
                         )
                     }
                 }
-                .frame(width: layout.closedSize.width, height: layout.closedSize.height, alignment: .top)
+                .frame(width: musicIslandSize.width, height: layout.closedSize.height, alignment: .top)
                 .transition(.opacity)
                 .zIndex(1)
             }
 
-            if !hidesMusicContentDuringAgentReturn && !hasPendingAgentEvent && status == .musicPreview {
+            if (!hidesMusicContentDuringAgentReturn || isMusicPlaybackActive) && !hasPendingAgentEvent && musicStatus == .musicPreview {
                 PreviewMusicView(
                     artwork: musicManager.artworkImage,
                     combinedPreviewText: combinedPreviewText,
@@ -129,7 +141,7 @@ extension ContentView {
                 .zIndex(2)
             }
 
-            if status == .focusPreview || (status == .focusCollapse && !focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) {
+            if musicStatus == .focusPreview || (musicStatus == .focusCollapse && !focusCollapseShowsMusic && !hidesFocusStatusContentDuringReturn) {
                 FocusMusicStatusView(
                     isActive: focusStatusIsActive,
                     hidesLabel: settingsManager.hideFocusLabel,
@@ -139,7 +151,7 @@ extension ContentView {
                 .zIndex(4)
             }
 
-            if status == .brightnessPreview || (status == .brightnessCollapse && !brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) {
+            if musicStatus == .brightnessPreview || (musicStatus == .brightnessCollapse && !brightnessCollapseShowsMusic && !hidesBrightnessStatusContentDuringReturn) {
                 BrightnessStatusView(
                     brightness: brightnessManager.brightnessLevel,
                     lineWidth: CGFloat(settingsManager.brightnessLineWidth),
@@ -151,7 +163,7 @@ extension ContentView {
                 .zIndex(4)
             }
 
-            if status == .volumePreview || (status == .volumeCollapse && !volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn) {
+            if musicStatus == .volumePreview || (musicStatus == .volumeCollapse && !volumeCollapseShowsMusic && !hidesVolumeStatusContentDuringReturn) {
                 VolumeStatusView(
                     volume: musicManager.outputVolume,
                     isMuted: musicManager.isOutputMuted,
@@ -164,30 +176,34 @@ extension ContentView {
                 .zIndex(4)
             }
 
-            if status == .networkClosed || status == .networkPreview {
+            if musicStatus == .networkClosed || musicStatus == .networkPreview {
                 NetworkStatusView(
                     event: networkStatusManager.currentEvent,
-                    size: status == .networkPreview
+                    size: musicStatus == .networkPreview
                         ? layout.networkPreviewSize
                         : layout.networkClosedSize,
-                    isExpanded: status == .networkPreview
+                    isExpanded: musicStatus == .networkPreview
                 )
                 .offset(y: 10)
                 .transition(.opacity.combined(with: .offset(y: 6)))
                 .zIndex(4)
             }
 
-            if !hidesMusicContentDuringAgentReturn && status == .opened {
+            if (!hidesMusicContentDuringAgentReturn || isMusicPlaybackActive) && musicStatus == .opened {
                 ExpandedMusicView(
                     artwork: musicManager.artworkImage,
                     artworkTransitionKey: artworkTransitionKey,
                     title: musicManager.trackTitle,
                     artist: musicManager.artistName,
                     sourceName: musicManager.sourceName,
-                    lyricLine: appleMusicLyricsManager.currentLine,
+                    lyricLine: focusSessionManager.phase == .idle || focusSessionManager.showsLyricsDuringFocus
+                        ? appleMusicLyricsManager.currentLine
+                        : "",
                     fiveHourUsage: codexUsageManager.fiveHour,
                     weeklyUsage: codexUsageManager.weekly,
-                    showsUsage: settingsManager.enableCodexUsageSync,
+                    showsUsage: false,
+                    focusManager: focusSessionManager,
+                    showsFocusExactTime: isHovered || focusSessionManager.alwaysShowsExactTime,
                     isPlaying: musicManager.isPlaying,
                     isShuffleEnabled: musicManager.isShuffleEnabled,
                     isShuffleControlAvailable: musicManager.isShuffleControlAvailable,
@@ -253,7 +269,7 @@ extension ContentView {
         }
         .animation(
             animation,
-            value: layout.islandSize.width
+            value: musicIslandSize.width
         )
         .animation(
             animation,
@@ -263,13 +279,13 @@ extension ContentView {
             animation,
             value: layout.cornerRadius
         )
-        .frame(width: clippedWidth, height: layout.islandSize.height)
+        .frame(width: clippedWidth, height: musicIslandSize.height)
         .clipped()
         .contentShape(RoundedRectangle(cornerRadius: layout.cornerRadius))
         .overlay(
             ZStack {
                 if !hasPendingAgentEvent &&
-                    (status == .closed || status == .musicPreview) &&
+                    (musicStatus == .closed || musicStatus == .musicPreview) &&
                     !showsCompactMediaControls {
                     IslandClickCatcher {
                         openCompactMusicPlayer()
@@ -282,7 +298,7 @@ extension ContentView {
                     }
                 }
 
-                if status != .opened && !hasPendingAgentEvent {
+                if musicStatus != .opened && !hasPendingAgentEvent {
                     ScrollSwipeCatcher { deltaX, deltaY in
                         handleMusicScroll(deltaX: deltaX, deltaY: deltaY)
                     }

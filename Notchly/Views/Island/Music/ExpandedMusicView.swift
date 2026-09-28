@@ -18,6 +18,8 @@ struct ExpandedMusicView: View {
     let fiveHourUsage: CodexUsageWindow
     let weeklyUsage: CodexUsageWindow
     let showsUsage: Bool
+    @ObservedObject var focusManager: FocusSessionManager
+    let showsFocusExactTime: Bool
     let isPlaying: Bool
     let isShuffleEnabled: Bool
     let isShuffleControlAvailable: Bool
@@ -112,9 +114,13 @@ struct ExpandedMusicView: View {
 
                     Spacer()
 
-                    Text(sourceName.isEmpty ? "Apple Music" : sourceName)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                    if focusManager.phase != .idle {
+                        FocusCountdownView(manager: focusManager, showsExactTime: showsFocusExactTime)
+                    } else {
+                        Text(sourceName.isEmpty ? "Apple Music" : sourceName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
                 }
                 .contentShape(Rectangle())
             }

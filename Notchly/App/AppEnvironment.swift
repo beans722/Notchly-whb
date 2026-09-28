@@ -31,6 +31,7 @@ final class AppEnvironment {
         settingsManager: settingsManager
     )
     let focusManager = FocusManager()
+    let focusSessionManager = FocusSessionManager()
     let brightnessManager = BrightnessManager()
     let networkStatusManager = NetworkStatusManager()
     lazy var agentEventManager = AgentEventManager(settingsManager: settingsManager)

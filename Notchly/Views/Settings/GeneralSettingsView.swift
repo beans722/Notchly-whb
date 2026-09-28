@@ -210,7 +210,7 @@ struct CodexSettingsView: View {
                     AgentHookIntegrationRow(
                         title: "Codex Live Activity",
                         manager: codexHookIntegrationManager,
-                        description: "Shows Codex beside the notch only while a task runs in the background. Hooks store status and IDs locally, never prompt text."
+                        description: "Running/completed status stays local. Approval alerts require trusting the Notchly hook in Codex /hooks; no prompt text is stored."
                     )
 
                     SettingsDivider()

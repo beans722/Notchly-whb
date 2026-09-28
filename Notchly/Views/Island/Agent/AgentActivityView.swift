@@ -21,14 +21,16 @@ struct AgentActivityView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 6) {
-                        Image(systemName: "sparkles")
+                        Image(systemName: event?.kind == .accessRequest
+                              ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                             .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(event?.kind == .accessRequest ? .orange : .mint)
 
                         Text(secondaryText)
                             .font(.system(size: 12, weight: .medium))
                             .lineLimit(1)
                     }
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.8))
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .padding(.horizontal, 12)

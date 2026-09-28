@@ -62,11 +62,12 @@ final class AgentEventManager: ObservableObject {
     @Published private(set) var isCodexRunning = false
     @Published private(set) var isCodexForeground = false
 
-    var showsBackgroundCodexActivity: Bool { isCodexRunning && !isCodexForeground }
+    var showsBackgroundCodexActivity: Bool { isCodexRunning }
 
     private let settingsManager: SettingsManager
     private let fileManager = FileManager.default
     private var fileEventSource: DispatchSourceFileSystemObject?
+    private var eventPollTask: Task<Void, Never>?
     private var fallbackWatchTask: Task<Void, Never>?
     private var clearTask: Task<Void, Never>?
     private var readOffset: UInt64 = 0
@@ -76,6 +77,10 @@ final class AgentEventManager: ObservableObject {
     private var activeCodexTurns: [String: Date] = [:]
     private var appActivationObserver: NSObjectProtocol?
     private var activityExpiryTask: Task<Void, Never>?
+    private var localActivityTask: Task<Void, Never>?
+    private let localActivityProbe = CodexSessionActivityProbe()
+    private var localCodexRunning = false
+    private var lastCodexCompletionDate: Date?
     private let maxEventsFileSizeBytes: UInt64 = 512 * 1024
     private let maxEventsFileLines = 1200
     private let minCompactionInterval: TimeInterval = 30
@@ -140,6 +145,28 @@ final class AgentEventManager: ObservableObject {
                 self?.expireStaleCodexTurns()
             }
         }
+        localActivityTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let snapshot = await self.localActivityProbe.snapshot()
+                guard !Task.isCancelled else { return }
+                self.localCodexRunning = snapshot.isRunning
+                self.expireStaleCodexTurns()
+                if snapshot.completedCount > 0 {
+                    if !snapshot.isRunning {
+                        self.activeCodexTurns.removeAll()
+                        self.expireStaleCodexTurns()
+                    }
+                    let isAwaitingApproval = self.currentEvent?.source.lowercased() == "codex" &&
+                        self.currentEvent?.kind == .accessRequest
+                    if !isAwaitingApproval,
+                       self.lastCodexCompletionDate.map({ Date().timeIntervalSince($0) >= 10 }) ?? true {
+                        self.publish(source: "codex", kind: .completed)
+                    }
+                }
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
 
         do {
             try ensureEventsFile()
@@ -151,16 +178,26 @@ final class AgentEventManager: ObservableObject {
         }
 
         startFileWatcher()
+        eventPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.readPendingEvents()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     func stop() {
         stopFileWatcher()
+        eventPollTask?.cancel()
+        eventPollTask = nil
         fallbackWatchTask?.cancel()
         fallbackWatchTask = nil
         clearTask?.cancel()
         clearTask = nil
         activityExpiryTask?.cancel()
         activityExpiryTask = nil
+        localActivityTask?.cancel()
+        localActivityTask = nil
         if let appActivationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(appActivationObserver)
             self.appActivationObserver = nil
@@ -284,7 +321,9 @@ final class AgentEventManager: ObservableObject {
                 if payload.source?.lowercased() == "codex" {
                     switch kind {
                     case .started, .progress, .cancelled:
-                        if kind == .progress { clearCurrentEvent(for: "codex") }
+                        if kind == .progress || kind == .cancelled {
+                            clearCurrentEvent(for: "codex")
+                        }
                         return
                     default: break
                     }
@@ -327,7 +366,7 @@ final class AgentEventManager: ObservableObject {
 
     private func expireStaleCodexTurns() {
         activeCodexTurns = activeCodexTurns.filter { Date().timeIntervalSince($0.value) < 7200 }
-        isCodexRunning = !activeCodexTurns.isEmpty
+        isCodexRunning = localCodexRunning || !activeCodexTurns.isEmpty
     }
 
     private func makeEvent(from payload: AgentEventPayload) -> AgentEvent? {
@@ -359,6 +398,13 @@ final class AgentEventManager: ObservableObject {
             return
         }
 
+        if currentEvent?.source.lowercased() == "codex",
+           currentEvent?.kind == .accessRequest,
+           event.source.lowercased() == "codex",
+           event.kind == .completed {
+            return
+        }
+
         let eventKey = duplicateKey(for: event)
         let now = Date()
 
@@ -378,6 +424,9 @@ final class AgentEventManager: ObservableObject {
 
         lastShownEventKey = eventKey
         lastShownEventDate = now
+        if event.source.lowercased() == "codex", event.kind == .completed {
+            lastCodexCompletionDate = now
+        }
         currentEvent = event
         eventID += 1
         debugLog("show event source=\(event.source) kind=\(event.kind.rawValue) ttl=\(event.ttl)")
@@ -487,11 +536,15 @@ final class AgentEventManager: ObservableObject {
             return ""
         }
 
-        if kind == .completed {
-            return "Task completed"
-        }
-
         let normalizedSource = source.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        if normalizedSource == "codex" {
+            switch kind {
+            case .accessRequest: return "需要审批"
+            case .completed: return "任务完成"
+            default: break
+            }
+        }
 
         switch kind {
         case .clear:
@@ -649,5 +702,89 @@ final class CodexAlertSoundPlayer {
         case .clear, .started, .progress:
             return completedSound ?? fallbackSound
         }
+    }
+}
+
+// Read only Codex's local turn lifecycle markers. Prompts and tool output are
+// never retained or displayed. This remains useful when a hook is not trusted.
+private struct CodexActivitySnapshot: Sendable {
+    let isRunning: Bool
+    let completedCount: Int
+}
+
+private actor CodexSessionActivityProbe {
+    private struct FileState {
+        let size: UInt64
+        let isRunning: Bool
+    }
+
+    private var states: [String: FileState] = [:]
+    private let maxInitialRead: UInt64 = 32 * 1024 * 1024
+    private let maxInactiveAge: TimeInterval = 30 * 60
+
+    func snapshot() -> CodexActivitySnapshot {
+        let sessionsURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex/sessions", isDirectory: true)
+        guard let enumerator = FileManager.default.enumerator(
+            at: sessionsURL,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return CodexActivitySnapshot(isRunning: false, completedCount: 0) }
+
+        let now = Date()
+        var recent: [(url: URL, modified: Date, size: UInt64)] = []
+        for case let url as URL in enumerator where url.pathExtension == "jsonl" {
+            guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                  let modified = values.contentModificationDate,
+                  let size = values.fileSize,
+                  now.timeIntervalSince(modified) < maxInactiveAge else { continue }
+            recent.append((url, modified, UInt64(size)))
+        }
+
+        let candidates = recent.sorted { $0.modified > $1.modified }.prefix(12)
+        let activePaths = Set(candidates.map { $0.url.path })
+        states = states.filter { activePaths.contains($0.key) }
+        var completedCount = 0
+        for candidate in candidates {
+            let path = candidate.url.path
+            if states[path]?.size == candidate.size { continue }
+            let previous = states[path]
+            let overlap: UInt64 = 4096
+            let offset = previous.map { min($0.size, candidate.size) > overlap
+                ? min($0.size, candidate.size) - overlap : 0 }
+                ?? (candidate.size > maxInitialRead ? candidate.size - maxInitialRead : 0)
+            guard let handle = try? FileHandle(forReadingFrom: candidate.url) else { continue }
+            defer { try? handle.close() }
+            guard (try? handle.seek(toOffset: offset)) != nil else { continue }
+            let data = handle.readDataToEndOfFile()
+            let latest = latestTurnState(in: data)
+            if previous?.isRunning == true, latest == false {
+                completedCount += 1
+            }
+            states[path] = FileState(size: candidate.size, isRunning: latest ?? previous?.isRunning ?? false)
+        }
+        return CodexActivitySnapshot(
+            isRunning: candidates.contains { states[$0.url.path]?.isRunning == true },
+            completedCount: completedCount
+        )
+    }
+
+    private func latestTurnState(in data: Data) -> Bool? {
+        let text = String(decoding: data, as: UTF8.self)
+        for line in text.split(separator: "\n").reversed() {
+            guard line.contains("\"task_started\"") || line.contains("\"task_complete\"") ||
+                    line.contains("\"turn_aborted\"") || line.contains("\"task_cancelled\""),
+                  let lineData = line.data(using: .utf8),
+                  let event = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  event["type"] as? String == "event_msg",
+                  let payload = event["payload"] as? [String: Any],
+                  let kind = payload["type"] as? String else { continue }
+            switch kind {
+            case "task_started": return true
+            case "task_complete", "turn_aborted", "task_cancelled": return false
+            default: break
+            }
+        }
+        return nil
     }
 }
